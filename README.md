@@ -2,6 +2,8 @@
 
 A VS Code–style web shell: activity bar, plugins, TanStack Router file routes, workspace explorer, stacked sidebar panels (Explorer + Agent), tabs, breadcrumbs and activity dialogs.
 
+**Live demo:** https://ppongtong.github.io/ide-shell/
+
 **Stack:** React 19.3 · React Compiler 1.0 · TanStack Router (file-based) · Zustand 5 · Vite 8 · TypeScript 6.0 · ESLint 10
 
 ```
