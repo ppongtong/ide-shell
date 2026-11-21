@@ -9,6 +9,7 @@ A VS Code–style web shell: activity bar, plugins, TanStack Router file routes,
 ```
 npm install
 npm run dev          # http://localhost:5173
+npm test             # Node built-in unit tests (registry + search-params)
 npm run lint         # TypeScript, React hooks/Compiler rules, folder import rules
 npm run build        # tsc + eslint + vite build
 npm run build:demo   # one self-contained HTML file in dist-demo/ (hash URLs)

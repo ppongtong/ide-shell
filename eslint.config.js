@@ -54,4 +54,8 @@ export default defineConfig([
     files: ['src/app/shell/**'],
     rules: forbid(['features', 'routes'], 'The shell must not import features; read them from the registry.'),
   },
+  {
+    files: ['tests/**'],
+    languageOptions: { globals: globals.node },
+  },
 ]);

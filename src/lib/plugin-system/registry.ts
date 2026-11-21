@@ -26,6 +26,23 @@ function indexById<T>(kind: string, list: T[], key: (t: T) => string): Map<strin
   return map;
 }
 
+function assertUniqueOrder<T extends { id: string; order: number }>(
+  kind: string,
+  list: T[],
+  groupOf: (t: T) => string,
+) {
+  const seen = new Map<string, string>();
+  for (const item of list) {
+    const group = groupOf(item);
+    const slot = `${group}:${item.order}`;
+    const existing = seen.get(slot);
+    if (existing) {
+      throw new Error(`Duplicate ${kind} order ${item.order} in "${group}" ("${existing}" and "${item.id}")`);
+    }
+    seen.set(slot, item.id);
+  }
+}
+
 export function createRegistry(plugins: Plugin[]): Registry {
   const activities = plugins.flatMap((p) => p.activities ?? []);
   const panels = plugins.flatMap((p) => p.panels ?? []);
@@ -36,6 +53,9 @@ export function createRegistry(plugins: Plugin[]): Registry {
   const itemType = indexById('item type', itemTypes, (t) => t.type);
 
   // Fail at boot, not at first click.
+  assertUniqueOrder('activity', activities, (a) => a.position ?? 'top');
+  assertUniqueOrder('panel', panels, (p) => p.container);
+
   for (const a of activities) {
     if (a.action.kind === 'togglePanel' && !panel.has(a.action.panelId))
       throw new Error(`Activity "${a.id}" toggles unknown panel "${a.action.panelId}"`);
@@ -43,7 +63,8 @@ export function createRegistry(plugins: Plugin[]): Registry {
       throw new Error(`Plugin page activity "${a.id}" must use to: "/${a.id}"`);
   }
 
-  const byOrder = (x: { order: number }, y: { order: number }) => x.order - y.order;
+  const byOrder = (x: { order: number; id: string }, y: { order: number; id: string }) =>
+    x.order - y.order || x.id.localeCompare(y.id);
 
   return {
     plugins,
