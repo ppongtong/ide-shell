@@ -32,8 +32,18 @@ describe('createPluginBridge', () => {
     useCounterBridge.getState().actions?.increment();
     assert.equal(n, 1);
 
+    let notifications = 0;
+    const unsub = useCounterBridge.subscribe(() => {
+      notifications += 1;
+    });
     useCounterBridge.getState().clear();
     assert.equal(useCounterBridge.getState().current, null);
     assert.equal(useCounterBridge.getState().actions, null);
+    assert.equal(notifications, 1);
+
+    // Calling clear() again when already empty is a no-op (0 subscriber notifications).
+    useCounterBridge.getState().clear();
+    assert.equal(notifications, 1);
+    unsub();
   });
 });

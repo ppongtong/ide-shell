@@ -59,6 +59,8 @@ export default function AgentPanel() {
   const registry = useRegistry();
   const wsId = useWorkspaceContract((s) => s.current?.workspace?.id);
   const wsName = useWorkspaceContract((s) => s.current?.workspace?.name);
+  const primaryId = useWorkspaceContract((s) => s.current?.primaryItem?.id);
+  const primaryName = useWorkspaceContract((s) => s.current?.primaryItem?.name);
   const activeName = useWorkspaceContract((s) => s.current?.activeItem?.name);
   const wsKey = wsId ?? '_none';
 
@@ -106,8 +108,20 @@ export default function AgentPanel() {
       <div className="agent-ctx">
         {wsName ? (
           <>
-            Context: <strong>{wsName}</strong>
-            {activeName && <> › <strong>{activeName}</strong></>}
+            <div>
+              Context: <strong>{wsName}</strong>
+              {activeName && <> › <strong>{activeName}</strong></>}
+            </div>
+            <div>
+              Primary:{' '}
+              {primaryName && primaryId ? (
+                <>
+                  <strong>{primaryName}</strong> <code>{primaryId}</code>
+                </>
+              ) : (
+                <span>Not selected</span>
+              )}
+            </div>
           </>
         ) : (
           'No workspace open'
@@ -116,7 +130,7 @@ export default function AgentPanel() {
       <div className="agent-msgs" aria-live="polite">
         {shown.length === 0 && (
           <p className="hint">
-            {`Ask about ${activeName ?? 'this workspace'}, or try “open <name>”, “close <name>”, or “collapse all”.`}
+            {`Ask about ${activeName ?? primaryName ?? 'this workspace'}, or try “primary key”, “open <name>”, “close <name>”, or “collapse all”.`}
           </p>
         )}
         {shown.map((m) => (

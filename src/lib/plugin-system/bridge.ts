@@ -26,6 +26,6 @@ export function createPluginBridge<Snapshot, Actions = Record<string, never>>():
     actions: null,
     setSnapshot: (current) => set({ current }),
     setActions: (actions) => set({ actions }),
-    clear: () => set({ current: null, actions: null }),
+    clear: () => set((s) => (s.current === null && s.actions === null ? s : { current: null, actions: null })),
   }));
 }

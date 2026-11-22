@@ -50,7 +50,7 @@ export function WorkspaceDetailPage() {
     syncActiveTab(workspace.id, item, isOpenable);
   }, [workspace.id, item, isOpenable]);
 
-  useSyncWorkspaceContract(workspace, item, activeItem);
+  useSyncWorkspaceContract(workspace, primaryItem, openKeys, item, activeItem);
 
   return (
     <div className="ws-detail">

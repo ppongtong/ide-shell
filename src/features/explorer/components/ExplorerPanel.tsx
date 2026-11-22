@@ -53,9 +53,9 @@ function WorkspaceExplorer({ workspace }: { workspace: WorkspaceInfo }) {
   // Auto-reveal ancestor folders/group whenever the active tab changes.
   useLayoutEffect(() => {
     if (!activeItem) return;
-    const toReveal = ancestorContainerIds(tree.byId, tree.primaryRoots, registry.itemRenderer, activeItem);
+    const toReveal = ancestorContainerIds(tree.byId, registry.itemRenderer, activeItem);
     revealItems(workspace.id, toReveal);
-  }, [workspace.id, activeItem, tree.byId, tree.primaryRoots, registry.itemRenderer, revealItems]);
+  }, [workspace.id, activeItem, tree.byId, registry.itemRenderer, revealItems]);
 
   useLayoutEffect(() => {
     setSnapshot({ workspaceId: workspace.id, collapsedIds: collapsed });
@@ -92,35 +92,39 @@ function WorkspaceExplorer({ workspace }: { workspace: WorkspaceInfo }) {
     const canExpand = hasChildren || isFolderOnly;
     const open = !collapsed.includes(item.id);
     const active = isPrimary ? !activeKey : itemKey(item.type, item.id) === activeKey;
+    const rowTitle = renderer ? renderer.label : `Unknown type "${item.type}"`;
+
+    const activateItem = () => {
+      if (isPrimary) {
+        useWorkspaceContract.getState().actions?.showPrimary();
+        if (hasChildren && !open) toggleNode(workspace.id, item.id);
+      } else {
+        useWorkspaceContract.getState().actions?.openItem(item.id);
+      }
+    };
 
     return (
       <li key={item.id}>
-        {isPrimary ? (
+        {hasChildren && !isFolderOnly ? (
           <div
             className={`tree-row ${extraClass} ${active ? 'active' : ''}`}
             style={{ paddingLeft: 8 + depth * 14 }}
           >
-            {hasChildren ? (
-              <button
-                type="button"
-                className="chev"
-                aria-label={open ? `Collapse ${item.name}` : `Expand ${item.name}`}
-                aria-expanded={open}
-                onClick={() => toggleNode(workspace.id, item.id)}
-              >
-                {open ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
-              </button>
-            ) : (
-              <span className="chev" aria-hidden="true" />
-            )}
+            <button
+              type="button"
+              className="chev"
+              aria-label={open ? `Collapse ${item.name}` : `Expand ${item.name}`}
+              aria-expanded={open}
+              onClick={() => toggleNode(workspace.id, item.id)}
+            >
+              {open ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+            </button>
             <button
               type="button"
               className="tree-main"
               aria-current={active ? 'true' : undefined}
-              onClick={() => {
-                useWorkspaceContract.getState().actions?.showPrimary();
-                if (hasChildren && !open) toggleNode(workspace.id, item.id);
-              }}
+              title={rowTitle}
+              onClick={activateItem}
             >
               <Icon size={14} />
               <span>{item.name}</span>
@@ -135,9 +139,9 @@ function WorkspaceExplorer({ workspace }: { workspace: WorkspaceInfo }) {
             aria-current={active ? 'true' : undefined}
             onClick={() => {
               if (isFolderOnly) toggleNode(workspace.id, item.id);
-              else useWorkspaceContract.getState().actions?.openItem(item.id);
+              else activateItem();
             }}
-            title={renderer ? renderer.label : `Unknown type "${item.type}"`}
+            title={rowTitle}
           >
             <span className="chev" aria-hidden="true">
               {canExpand && (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
@@ -176,7 +180,10 @@ function WorkspaceExplorer({ workspace }: { workspace: WorkspaceInfo }) {
         </li>
       )}
 
-      {/* 2. Collapsible section for every registered openable ItemRenderer */}
+      {/* 2. Top-level folders (`component` omitted) */}
+      {tree.rootFolders.map((folder) => renderNode(folder, 0))}
+
+      {/* 3. Collapsible section for every registered openable ItemRenderer */}
       {tree.groupRenderers.map((renderer) => {
         const groupId = `group:${renderer.type}`;
         const open = !collapsed.includes(groupId);
@@ -210,7 +217,7 @@ function WorkspaceExplorer({ workspace }: { workspace: WorkspaceInfo }) {
         );
       })}
 
-      {/* 3. Fallback group for items whose plugin is not loaded */}
+      {/* 4. Fallback group for items whose plugin is not loaded */}
       {tree.unknownItems.length > 0 && (
         <li key={OTHER_GROUP_ID}>
           <button

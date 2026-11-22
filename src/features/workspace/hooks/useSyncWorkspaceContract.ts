@@ -10,30 +10,34 @@ import { workspacesApi } from '../api/workspaces';
 import { useWorkspaceContract } from '../contract';
 import { indexItems } from '../lib/search';
 import { createTabController } from './useTabs';
-import { useWorkbench } from '../stores/workbench';
 
 export function useSyncWorkspaceContract(
   workspace: WorkspaceInfo,
+  primaryItem: Item | undefined,
+  openKeys: readonly string[],
   activeKey?: string,
   activeItem?: Item,
 ) {
   const registry = useRegistry();
   const router = useRouter();
-  const openKeys = useWorkbench((s) => s.tabs[workspace.id] ?? EMPTY);
   const setSnapshot = useWorkspaceContract((s) => s.setSnapshot);
   const setActions = useWorkspaceContract((s) => s.setActions);
   const clear = useWorkspaceContract((s) => s.clear);
 
+  // Computed in render body so React Compiler memoizes `openItems` strictly on `(workspace, openKeys)`,
+  // keeping `current.openItems` referentially stable (`===`) across switches between already-open tabs.
+  const { byKey } = indexItems(workspace);
+  const openItems = openKeys.length === 0 ? EMPTY : openKeys.flatMap((k) => byKey.get(k) ?? EMPTY);
+
   useLayoutEffect(() => {
-    const { byKey } = indexItems(workspace);
-    const openItems = openKeys.flatMap((k) => byKey.get(k) ?? EMPTY);
     setSnapshot({
       workspace,
+      primaryItem,
       activeKey,
       activeItem,
       openItems,
     });
-  }, [workspace, activeKey, activeItem, openKeys, setSnapshot]);
+  }, [workspace, primaryItem, activeKey, activeItem, openItems, setSnapshot]);
 
   useLayoutEffect(() => {
     const getCurrent = () => useWorkspaceContract.getState().current?.workspace ?? null;

@@ -1,23 +1,11 @@
 // Mock backend. Swap the bodies for real fetch calls.
 import { EMPTY, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
+import type { PrimarySelectionInput } from '../contract';
 
 export interface Workspace extends WorkspaceInfo {
   readonly description: string;
 }
 export type WorkspaceSummary = Omit<Workspace, 'items'>;
-
-export interface SeedChildInput {
-  readonly id: string;
-  readonly type: string;
-  readonly name: string;
-  readonly content?: string;
-}
-
-export interface SetPrimaryInput {
-  readonly name: string;
-  readonly content?: string;
-  readonly children?: readonly SeedChildInput[];
-}
 
 export function createSlug(name: string, existingIds: Iterable<string>): string {
   const taken = new Set(existingIds);
@@ -191,7 +179,7 @@ export const workspacesApi = {
     return delay(ws, 120);
   },
 
-  setPrimary: async (wsId: string, { name, content, children = EMPTY }: SetPrimaryInput) => {
+  setPrimary: async (wsId: string, { name, content, children = EMPTY }: PrimarySelectionInput) => {
     const index = db.findIndex((w) => w.id === wsId);
     const existing = index >= 0 ? db[index] : undefined;
     if (!existing) throw new Error(`Workspace "${wsId}" not found`);
@@ -220,10 +208,14 @@ export const workspacesApi = {
   },
 };
 
-/** Walk parentId up to the root: [Storefront Core, checkout.ts] */
+/** Walk parentId up to the root (cycle-safe): [Storefront Core, checkout.ts] */
 export function pathTo(items: readonly Item[], id: string): Item[] {
   const byId = new Map(items.map((i) => [i.id, i]));
   const chain: Item[] = [];
-  for (let cur = byId.get(id); cur; cur = cur.parentId ? byId.get(cur.parentId) : undefined) chain.unshift(cur);
+  const seen = new Set<string>();
+  for (let cur = byId.get(id); cur && !seen.has(cur.id); cur = cur.parentId ? byId.get(cur.parentId) : undefined) {
+    seen.add(cur.id);
+    chain.unshift(cur);
+  }
   return chain;
 }

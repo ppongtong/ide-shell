@@ -21,6 +21,8 @@ export interface PrimarySelectionInput {
 
 export interface WorkspaceSnapshot {
   readonly workspace: WorkspaceInfo;
+  /** Resolved root `type: 'primary'` Item for this workspace (`undefined` until a primary key is selected). */
+  readonly primaryItem?: Item;
   /** Raw `?item=` URL search key (`"type:id"`), even if unopenable; `undefined` when pinned Primary tab is active. */
   readonly activeKey?: string;
   /** Resolved Item of the active tab when `activeKey` refers to an openable non-primary item. */

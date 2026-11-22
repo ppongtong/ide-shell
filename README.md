@@ -74,7 +74,7 @@ Every plugin lives in `src/features/<name>/` with two explicit public doors:
   - `type` without a `component` (`folder`): Acts as a collapsible folder in `ExplorerPanel`.
 - **Shell state (`useShellLocation`, `useRegistry`):** Routes declare `staticData.container` (e.g. `'workspace.detail'`) instead of hardcoding route strings in `lib/plugin-system`. `ActivityBar` toggles `?panels=` generically on the active container route (`to: '.'`).
 - **Feature-to-feature state (`createPluginBridge`):**
-  - `features/workspace/contract.ts` publishes `{ workspace, activeKey, activeItem, openItems }` and `{ isActiveWorkspace, showPrimary, openItem, closeItem, setPrimaryItem }` via `useLayoutEffect`.
+  - `features/workspace/contract.ts` publishes `{ workspace, primaryItem, activeKey, activeItem, openItems }` and `{ isActiveWorkspace, showPrimary, openItem, closeItem, setPrimaryItem }` via `useLayoutEffect`.
   - `features/explorer/contract.ts` consumes `workspace/contract` to render the tree **and** publishes `{ workspaceId, collapsedIds }` + `{ revealItems, collapseAll, expandAll }`—used by `WorkspaceBreadcrumbs` and `AgentPanel`.
 
 ## React 19.x features used

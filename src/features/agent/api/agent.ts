@@ -46,6 +46,19 @@ function reply(question: string, ctx: WorkspaceSnapshot | null): AgentReply {
       actions: [{ target: 'workspace', type: 'showPrimary' }],
     };
   }
+  if (/^(what(?:'s| is)\s+(?:the\s+)?)?primary(?:\s+key)?\??$/.test(normalized)) {
+    const primary = ctx.primaryItem;
+    if (!primary) {
+      return {
+        text: `(demo) ${ws.name} has no primary key selected yet. Opening the Primary Key selector.`,
+        actions: [{ target: 'workspace', type: 'showPrimary' }],
+      };
+    }
+    return {
+      text: `(demo) Primary key in ${ws.name}: “${primary.name}” (id: ${primary.id}, type: ${primary.type}).`,
+      actions: [],
+    };
+  }
 
   const command = /^(open|close)\s+(.+)$/i.exec(question.trim());
   if (command) {
@@ -61,9 +74,13 @@ function reply(question: string, ctx: WorkspaceSnapshot | null): AgentReply {
     };
   }
 
-  const where = ctx.activeItem ? `${ctx.activeItem.name} in ${ws.name}` : ws.name;
+  const where = ctx.activeItem
+    ? `${ctx.activeItem.name} in ${ws.name}`
+    : ctx.primaryItem
+      ? `${ctx.primaryItem.name} (${ctx.primaryItem.id}) in ${ws.name}`
+      : ws.name;
   return {
-    text: `(demo) I'd look at ${where} to answer “${question}”. Try “open <name>”, “close <name>”, or “collapse all”.`,
+    text: `(demo) I'd look at ${where} to answer “${question}”. Try “primary key”, “open <name>”, “close <name>”, or “collapse all”.`,
     actions: [],
   };
 }
@@ -71,7 +88,9 @@ function reply(question: string, ctx: WorkspaceSnapshot | null): AgentReply {
 function chainIdsTo(items: readonly Item[], id: string): string[] {
   const byId = new Map(items.map((i) => [i.id, i]));
   const ids: string[] = [];
-  for (let cur = byId.get(id); cur; cur = cur.parentId ? byId.get(cur.parentId) : undefined) {
+  const seen = new Set<string>();
+  for (let cur = byId.get(id); cur && !seen.has(cur.id); cur = cur.parentId ? byId.get(cur.parentId) : undefined) {
+    seen.add(cur.id);
     ids.unshift(cur.id);
   }
   return ids;

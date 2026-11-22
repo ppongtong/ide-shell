@@ -2,8 +2,8 @@
 import type { DialogProps } from '@/lib/plugin-system';
 
 const shortcuts = [
-  { keys: '← / →', action: 'Switch open editor tabs (when TabBar is focused)' },
-  { keys: 'Home / End', action: 'Jump to pinned Details tab or last open tab' },
+  { keys: '← / →', action: 'Switch open tabs (when TabBar is focused)' },
+  { keys: 'Home / End', action: 'Jump to pinned Primary tab or last open tab' },
   { keys: '↑ / ↓', action: 'Resize stacked sidebar panels (when divider is focused)' },
   { keys: 'Esc', action: 'Dismiss modal dialog' },
 ];

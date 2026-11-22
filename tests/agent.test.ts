@@ -16,16 +16,19 @@ const testPlugin: Plugin = {
   ],
 };
 
+const primaryRoot = { id: 'primary-acme', type: 'primary', name: 'Storefront Core', parentId: null } as const;
+
 const snapshot: WorkspaceSnapshot = {
   workspace: {
     id: 'acme',
     name: 'Acme',
     items: [
-      { id: 'primary-acme', type: 'primary', name: 'Storefront Core', parentId: null },
+      primaryRoot,
       { id: 'src', type: 'folder', name: 'src', parentId: null },
       { id: 'utils', type: 'file', name: 'utils.ts', parentId: 'src', content: '' },
     ],
   },
+  primaryItem: primaryRoot,
   openItems: [],
 };
 
@@ -94,5 +97,21 @@ describe('agentApi & action runner', () => {
 
     const expandRes = await agentApi.ask('expand all', snapshot, 0);
     assert.deepEqual(expandRes.actions, [{ target: 'explorer', type: 'expandAll' }]);
+  });
+
+  it('reads primaryItem from WorkspaceSnapshot without coupling to feature/primary', async () => {
+    const configured = await agentApi.ask('what is the primary key?', snapshot, 0);
+    assert.match(configured.text, /Storefront Core/);
+    assert.match(configured.text, /id: primary-acme, type: primary/);
+    assert.deepEqual(configured.actions, []);
+
+    const unsetSnapshot: WorkspaceSnapshot = {
+      workspace: { id: 'fresh', name: 'Fresh', items: [] },
+      primaryItem: undefined,
+      openItems: [],
+    };
+    const unset = await agentApi.ask('primary key', unsetSnapshot, 0);
+    assert.match(unset.text, /no primary key selected yet/);
+    assert.deepEqual(unset.actions, [{ target: 'workspace', type: 'showPrimary' }]);
   });
 });

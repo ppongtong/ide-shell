@@ -265,7 +265,7 @@ Plugins never import another plugin's internal files (`stores/`, `components/`, 
 | --- | --- | --- | --- |
 | **`useShellLocation()`** | `@/lib/plugin-system` | Always | `{ path, container, panels }` — current URL path, active container ID (e.g. `'workspace.detail'`), and open optional `?panels=` |
 | **`useRegistry()`** | `@/lib/plugin-system` | Always | Boot-time plugin contributions: `plugins`, `activity`, `panel`, `itemRenderer`, `panelsFor(container)`, `activeRouteActivity(path)` |
-| **`useWorkspaceContract`** | `@/features/workspace/contract` | On `/workspaces/$wsId` (`null` elsewhere) | `current`: `{ workspace, activeKey, activeItem, openItems }`<br>`actions`: `{ isActiveWorkspace(wsId), showPrimary(), setPrimaryItem(input), openItem(itemId), closeItem(itemId) }` |
+| **`useWorkspaceContract`** | `@/features/workspace/contract` | On `/workspaces/$wsId` (`null` elsewhere) | `current`: `{ workspace, primaryItem, activeKey, activeItem, openItems }`<br>`actions`: `{ isActiveWorkspace(wsId), showPrimary(), setPrimaryItem(input), openItem(itemId), closeItem(itemId) }` |
 | **`useExplorerContract`** | `@/features/explorer/contract` | While `ExplorerPanel` is mounted (`null` if unloaded/unmounted) | `current`: `{ workspaceId, collapsedIds }`<br>`actions`: `{ revealItems(wsId, nodeIds), collapseAll(), expandAll() }` |
 | **`resetAllPersisted()`** | `@/stores/persist` | Always | Resets all registered persisted stores (`ide:*`) and shell `lastHref` in memory |
 
@@ -294,6 +294,7 @@ Follow **three rules** to prevent unnecessary re-renders and handle optional plu
    import { useExplorerContract } from '@/features/explorer/contract';
 
    const wsName = useWorkspaceContract((s) => s.current?.workspace.name);
+   const primaryName = useWorkspaceContract((s) => s.current?.primaryItem?.name);
    const activeName = useWorkspaceContract((s) => s.current?.activeItem?.name);
    const collapsedIds = useExplorerContract((s) => s.current?.collapsedIds ?? EMPTY);
    ```
@@ -337,14 +338,18 @@ export const useMyPluginContract = createPluginBridge<MySnapshot, MyActions>();
 ```
 
 ```tsx
-// 2. Inside your mounted plugin component/hook — publish synchronously via useLayoutEffect:
+// 2. Inside your mounted plugin component/hook — publish synchronously via useLayoutEffect.
+// Compute derived arrays/objects in the render body (NOT inside useLayoutEffect) so React Compiler
+// memoizes them and keeps `===` reference stability across unrelated updates:
+const derivedItems = rawIds.length === 0 ? EMPTY : rawIds.map((id) => byId.get(id));
+
 const setSnapshot = useMyPluginContract((s) => s.setSnapshot);
 const setActions = useMyPluginContract((s) => s.setActions);
 const clear = useMyPluginContract((s) => s.clear);
 
 useLayoutEffect(() => {
-  setSnapshot({ activeFilter });
-}, [activeFilter, setSnapshot]);
+  setSnapshot({ activeFilter, items: derivedItems });
+}, [activeFilter, derivedItems, setSnapshot]);
 
 useLayoutEffect(() => {
   setActions({ setFilter });
@@ -410,12 +415,12 @@ sequenceDiagram
     participant Agent as AgentPanel
     participant API as agentApi
 
-    Page->>WsC: setSnapshot({ workspace, activeKey, activeItem, openItems })
+    Page->>WsC: setSnapshot({ workspace, primaryItem, activeKey, activeItem, openItems })
     Page->>WsC: setActions({ isActiveWorkspace, showPrimary, setPrimaryItem, openItem, closeItem })
     WsC-->>Exp: Renders Explorer tree
     Exp->>ExpC: setSnapshot({ workspaceId, collapsedIds })
     Exp->>ExpC: setActions({ revealItems, collapseAll, expandAll })
-    WsC-->>Agent: Narrow selectors update "Context: Acme > checkout.ts"
+    WsC-->>Agent: Narrow selectors update Context + Primary Key
 
     Agent->>WsC: getState().current (before await)
     Agent->>API: ask("open checkout.ts", askedSnapshot)
@@ -450,15 +455,15 @@ sequenceDiagram
 
     User->>Bar: Click "New workspace"
     Bar->>Dialog: useShell.showDialog("new-workspace")
-    User->>Dialog: Type Name + optional Description and click "Create workspace"
+    User->>Dialog: Type Name + optional Description and click "Create"
     Dialog->>API: create(name, description) (items = [])
     API-->>Dialog: Created empty Workspace
-    Dialog->>Router: router.invalidate() + hideDialog() + navigate(/workspaces/$wsId)
+    Dialog->>Router: router.invalidate() + close() + navigate(/workspaces/$wsId)
     Router-->>DetailPage: Load & render workspace (pinned Primary tab active)
     DetailPage-->>Primary: Mount PrimaryKeyComponent (item === undefined)
     Note over Primary: Explorer shows "Select primary key..." and Primary tab renders PrimaryKeySelector
 
-    User->>Primary: Choose Primary Key card and click "Set primary key"
+    User->>Primary: Choose Primary Key card and click "Select primary key"
     Primary->>DetailPage: workspaceContract.actions.setPrimaryItem({ name, content, children })
     DetailPage->>API: setPrimary(wsId, input)
     DetailPage->>Router: router.invalidate()
@@ -472,8 +477,8 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | Open creation dialog | Click `New workspace` (Activity Bar `[+]` or Workspaces page) | `DialogHost` opens `NewWorkspaceDialog` over the current screen without changing the URL | Pressing `Esc` or `Cancel` closes the dialog cleanly without touching browser history or `lastHref` |
 | Submit invalid Name | Submit empty Name (or whitespace-only Name) | Native HTML `required` catches empty input; `formAction` catches whitespace-only input with `role="alert"` and `aria-invalid="true"` | Dialog stays open with typed fields preserved |
-| Create workspace | Click `Create workspace` | Button shows `"Creating…"` (`useFormStatus`), dialog closes, router navigates to `/workspaces/$wsId` | Pinned first tab renders `PrimaryKeyComponent` (`item === undefined`), and Explorer shows `Select primary key…` |
-| Select Primary Key | Choose a Primary Key option in `PrimaryKeySelector` and click `Set primary key` | Calls `actions.setPrimaryItem(...)`, seeds `type: 'primary'` root + linked children, and transitions `PrimaryKeyComponent` in-place to `PrimaryKeyDetail` | Workspace and Explorer stay agnostic of how `PrimaryKeyComponent` renders its selector or detail view |
+| Create workspace | Click `Create` | Button shows `"Creating…"` (`useFormStatus`), dialog closes, router navigates to `/workspaces/$wsId` | Pinned first tab renders `PrimaryKeyComponent` (`item === undefined`), and Explorer shows `Select primary key…` |
+| Select Primary Key | Choose a Primary Key option in `PrimaryKeySelector` and click `Select primary key` | Button shows `"Applying…"` (`useTransition`), calls `actions.setPrimaryItem(...)`, seeds `type: 'primary'` root + linked children, and transitions `PrimaryKeyComponent` in-place to `PrimaryKeyDetail` | Workspace and Explorer stay agnostic of how `PrimaryKeyComponent` renders its selector or detail view |
 
 ---
 
@@ -649,14 +654,14 @@ export interface ItemRenderer {
   readonly type: string;
   readonly label: string;
   readonly pluralLabel?: string;
-  readonly icon: ComponentType<{ size?: number }>;
-  readonly component?: LazyExoticComponent<ComponentType<ItemRendererProps>>;
+  readonly icon: Icon;
+  readonly component?: Lazy<ItemRendererProps>;
 }
 ```
 
 - **Pinned Primary renderer (`src/features/primary/plugin.ts`):** Registers `type: 'primary'` -> `PrimaryKeyComponent`. `ItemRendererHost` mounts it in the pinned first tab (`?item=` omitted). When `item === undefined` (new workspace), `PrimaryKeyComponent` renders `PrimaryKeySelector` and signals selection via `useWorkspaceContract.getState().actions?.setPrimaryItem(...)`; when `item !== undefined`, it renders `PrimaryKeyDetail`. Neither `workspace` nor `explorer` knows how `PrimaryKeyComponent` renders its internal states.
 - **Standalone feature renderer (`src/features/notebook/plugin.ts`):** Registers `type: 'notebook'` -> `NotebookEditor` (`pluralLabel: 'Notebooks'`). `ExplorerPanel` groups top-level notebooks under **Notebooks**, `TabBar` renders the tab icon, and `ItemRendererHost` lazy-loads `NotebookEditor` inside `<Activity>` so cell outputs survive tab switches.
-- **Core lightweight viewers & grouping nodes (`src/features/workspace/plugin.ts`):** Registers `file` (`FileEditor`), `dataset` (`DatasetEditor`), and `folder` (`component` omitted—any item with `parentId` children gets a collapsible chevron in Explorer, and clicking an item without a `component` toggles expand/collapse). Unregistered backend item types fall back cleanly into Explorer's **Other** group.
+- **Core lightweight viewers & grouping nodes (`src/features/workspace/plugin.ts`):** Registers `file` (`FileEditor`), `dataset` (`DatasetEditor`), and `folder` (`component` omitted—top-level folders render as expandable containers with their nested `parentId` subtree rather than duplicating children into root type groups, and clicking an item without a `component` toggles expand/collapse). Unregistered backend item types fall back cleanly into Explorer's **Other** group.
 
 ---
 

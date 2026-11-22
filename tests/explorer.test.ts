@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Item, ItemRenderer } from '../src/lib/plugin-system/types.ts';
-import { buildExplorerTree } from '../src/features/explorer/lib/tree.ts';
+import { ancestorContainerIds, buildExplorerTree } from '../src/features/explorer/lib/tree.ts';
 import { useExplorerStore } from '../src/features/explorer/stores/explorer-store.ts';
 import { resetAllPersisted } from '../src/stores/persist.ts';
 
@@ -54,6 +54,33 @@ describe('explorer tree & store', () => {
       tree.unknownItems.map((i) => i.name),
       ['revenue.nb'],
     );
+  });
+
+  it('preserves root folders with nested children without duplicating folder children into root type groups', () => {
+    const items: Item[] = [
+      { id: 'src', type: 'folder', name: 'src', parentId: null },
+      { id: 'nested-util', type: 'file', name: 'utils.ts', parentId: 'src' },
+      { id: 'root-app', type: 'file', name: 'App.tsx', parentId: null },
+      // Malformed cyclic parentId data must not drop items or infinite-loop:
+      { id: 'cyc-a', type: 'file', name: 'cycA.ts', parentId: 'cyc-b' },
+      { id: 'cyc-b', type: 'file', name: 'cycB.ts', parentId: 'cyc-a' },
+    ];
+
+    const tree = buildExplorerTree(items, renderers);
+    assert.deepEqual(
+      tree.rootFolders.map((i) => i.id),
+      ['src'],
+    );
+    assert.deepEqual(
+      (tree.byParent.get('src') ?? []).map((i) => i.id),
+      ['nested-util'],
+    );
+    assert.deepEqual(
+      (tree.byRendererType.get('file') ?? []).map((i) => i.id),
+      ['root-app', 'cyc-a', 'cyc-b'],
+    );
+    assert.deepEqual(ancestorContainerIds(tree.byId, renderers, items[1]!), ['src']);
+    assert.deepEqual(ancestorContainerIds(tree.byId, renderers, items[2]!), ['group:file']);
   });
 
   it('toggles, collapses all, reveals paths, and resets with resetAllPersisted', () => {

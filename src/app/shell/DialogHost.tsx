@@ -14,11 +14,16 @@ export function DialogHost() {
   if (activity?.action.kind !== 'dialog') return null;
   const Dialog = activity.action.dialog;
 
+  const close = () => {
+    if (dialogRef.current?.open) dialogRef.current.close();
+    else hideDialog();
+  };
+
   return (
     <Modal ref={dialogRef} label={activity.title} onClose={hideDialog}>
       <Suspense fallback={<div className="empty">Loading…</div>}>
         {/* close() → native close → onClose → store cleared → unmounted */}
-        <Dialog close={() => dialogRef.current?.close()} />
+        <Dialog close={close} />
       </Suspense>
     </Modal>
   );
