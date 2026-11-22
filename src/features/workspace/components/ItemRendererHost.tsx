@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────
 // Pinned Primary tab + every OPEN item tab stay mounted inside
 // <Activity>; only the active one is visible. Both render through
-// `registry.itemRenderer.get(type)?.component` — EditorHost never
-// knows what any plugin renders inside its tab.
+// `registry.itemRenderer.get(type)?.component` — ItemRendererHost
+// never knows what any plugin renders inside its tab.
 // ─────────────────────────────────────────────────────────────
 import { Activity, Suspense } from 'react';
 import { parseItem, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
@@ -15,7 +15,7 @@ interface Props {
   activeKey?: string;
 }
 
-export function EditorHost({ workspace, primaryItem, openKeys, activeKey }: Props) {
+export function ItemRendererHost({ workspace, primaryItem, openKeys, activeKey }: Props) {
   // If the URL holds an unopenable/unknown `?item=`, still render its inline error view cleanly.
   const keys = activeKey && !openKeys.includes(activeKey) ? [...openKeys, activeKey] : openKeys;
 

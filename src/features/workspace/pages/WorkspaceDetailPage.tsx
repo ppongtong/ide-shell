@@ -10,7 +10,7 @@ import { useWorkbench } from '../stores/workbench';
 import { useSyncWorkspaceContract } from '../hooks/useSyncWorkspaceContract';
 import { SidebarPanels } from '../components/SidebarPanels';
 import { TabBar } from '../components/TabBar';
-import { EditorHost } from '../components/EditorHost';
+import { ItemRendererHost } from '../components/ItemRendererHost';
 
 const route = getRouteApi('/workspaces/$wsId');
 
@@ -29,7 +29,7 @@ export function WorkspaceDetailPage() {
   const activeItem = isOpenable ? byKey.get(item) : undefined;
   const primaryItem = workspace.items.find((i) => i.type === 'primary' && i.parentId === null);
 
-  // Compute one canonical open-tab list so TabBar and EditorHost always match on deep links.
+  // Compute one canonical open-tab list so TabBar and ItemRendererHost always match on deep links.
   const validStored = storedTabs.filter((k) => validKeySet.has(k));
   const openKeys = isOpenable && !validStored.includes(item) ? [...validStored, item] : validStored;
 
@@ -58,7 +58,7 @@ export function WorkspaceDetailPage() {
       <SidebarPanels container="workspace.detail" panels={parsePanels(panels)} />
       <div className="editor-col">
         <TabBar workspace={workspace} primaryItem={primaryItem} openKeys={openKeys} activeKey={item} />
-        <EditorHost workspace={workspace} primaryItem={primaryItem} openKeys={openKeys} activeKey={item} />
+        <ItemRendererHost workspace={workspace} primaryItem={primaryItem} openKeys={openKeys} activeKey={item} />
       </div>
     </div>
   );

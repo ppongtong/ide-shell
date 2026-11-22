@@ -81,7 +81,7 @@ Every plugin lives in `src/features/<name>/` with two explicit public doors:
 
 | Feature | Where | Why |
 | --- | --- | --- |
-| `<Activity>` (19.2) | `features/workspace/components/EditorHost.tsx` | Pinned Primary tab + open tabs stay mounted while hidden: edits & selections survive tab switches |
+| `<Activity>` (19.2) | `features/workspace/components/ItemRendererHost.tsx` | Pinned Primary tab + open tabs stay mounted while hidden: edits & selections survive tab switches |
 | `<Activity>` (19.2) | `components/ui/ResizableStack.tsx` | Hidden sidebar panels keep their state (agent chat) |
 | `<ViewTransition>` (19.3) | `features/agent/components/AgentPanel.tsx` | New messages animate in |
 | `useEffectEvent` (19.2) | `WorkspaceDetailPage.tsx` | Effects read latest callbacks without extra dependencies |

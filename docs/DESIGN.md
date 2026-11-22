@@ -32,7 +32,7 @@ IDE Shell is a VS Code–style web app shell built with **React 19.3**, **TanSta
 |      | EXPLORER                | [Primary Key] [checkout.ts x] [utils.ts x]  |
 | [WS] | v [Key] Storefront Core +---------------------------------------------+
 | [Ag] |     catalog.csv         |                                             |
-| [Rp] |     checkout.ts         |   EditorHost                                |
+| [Rp] |     checkout.ts         |   ItemRendererHost                          |
 |      | v Files (3)             |   - Pinned Primary tab (index 0, primary)   |
 |      |     App.tsx             |   - Open file / dataset / notebook tabs     |
 |      |     README.md           |   (hidden tabs stay mounted in Activity)    |
@@ -50,7 +50,7 @@ IDE Shell is a VS Code–style web app shell built with **React 19.3**, **TanSta
 - **Activity Bar** (`48px`, left): Top group holds area/panel buttons (`Workspaces`, `Agent`, `Reports`). Bottom group holds utility buttons (`New workspace` dialog, `Keyboard shortcuts` dialog, `Settings`).
 - **Breadcrumbs** (`30px`, top): Built from the active nested routes. Inside a workspace, shows a workspace `<select>` switcher plus clickable parent nodes (or the primary item / `Primary Key` label when the pinned Primary tab is active).
 - **Sidebar** (`260px` desktop / `44vw` phone): Stacked panels managed by `ResizableStack`. `Explorer` is always visible; optional panels like `Agent` appear when listed in `?panels=`.
-- **TabBar + EditorHost** (right): The **Primary** tab (`type: 'primary'`) is always pinned at index `0` with no close button and renders the registered `primary` `ItemRenderer` (`PrimaryKeyComponent`). Other items with a `component` (`file`, `dataset`, `notebook`) open as closable tabs to its right.
+- **TabBar + ItemRendererHost** (right): The **Primary** tab (`type: 'primary'`) is always pinned at index `0` with no close button and renders the registered `primary` `ItemRenderer` (`PrimaryKeyComponent`). Other items with a `component` (`file`, `dataset`, `notebook`) open as closable tabs to its right.
 
 ### 2.2 React Component Tree
 
@@ -75,13 +75,13 @@ flowchart TD
 
     DetailPage --> Sidebar["SidebarPanels (container=workspace.detail) -> ResizableStack"]
     DetailPage --> TabBar["TabBar (pinned Primary + open tabs)"]
-    DetailPage --> EditorHost["EditorHost"]
+    DetailPage --> ItemRendererHost["ItemRendererHost"]
 
     Sidebar --> ActExp["Activity: ExplorerPanel"]
     Sidebar --> ActAg["Activity: AgentPanel"]
 
-    EditorHost --> ActPri["Activity: PrimaryKeyComponent (type: primary)"]
-    EditorHost --> ActEd["Activity: FileEditor / DatasetEditor / NotebookEditor"]
+    ItemRendererHost --> ActPri["Activity: PrimaryKeyComponent (type: primary)"]
+    ItemRendererHost --> ActEd["Activity: FileEditor / DatasetEditor / NotebookEditor"]
 ```
 
 ---
@@ -227,7 +227,7 @@ flowchart LR
 
 ### 5.2 Important Persistence & Performance Boundaries
 
-- **What survives switching tabs inside the same workspace:** Unsaved `FileEditor` text, `NotebookEditor` cell output, `PrimaryKeyComponent` state, and `AgentPanel` chat all survive because `EditorHost` and `ResizableStack` keep hidden children mounted inside React `<Activity>`.
+- **What survives switching tabs inside the same workspace:** Unsaved `FileEditor` text, `NotebookEditor` cell output, `PrimaryKeyComponent` state, and `AgentPanel` chat all survive because `ItemRendererHost` and `ResizableStack` keep hidden children mounted inside React `<Activity>`.
 - **Synchronous contract sync (`useLayoutEffect`) & no-op persistence guards:** `useSyncWorkspaceContract` and `ExplorerPanel` publish snapshots via `useLayoutEffect` (zero 1-frame lag), and `useWorkbench` / `useExplorerStore` check `get()` before calling `set()` so Zustand `persist` never writes unchanged state to `localStorage`.
 - **Zero shell/panel re-render cascades on tab switch:** `useShellLocation` omits `?item=`, `Shell` records `lastHref` via `router.subscribe('onResolved')`, `ActivityBar` reads `lastHref` via `.getState()` on click, `ExplorerPanel` caches `buildExplorerTree` strictly on `(items, itemRenderers)`, and `AgentPanel` selects primitive fields (`wsId`, `wsName`, `activeName`).
 - **Zero React renders during 120 Hz sidebar resize:** `ResizableStack` updates `flexGrow` and `aria-valuenow` directly via DOM refs on `pointermove` and commits once on `pointerup`.
@@ -387,7 +387,7 @@ sequenceDiagram
     participant Store as useWorkbench (Zustand)
     participant Router as TanStack Router (URL)
     participant Page as WorkspaceDetailPage
-    participant Host as TabBar + EditorHost
+    participant Host as TabBar + ItemRendererHost
 
     User->>Exp: Click "utils.ts"
     Exp->>WsC: actions.openItem("utils")
@@ -486,7 +486,7 @@ sequenceDiagram
     actor User
     participant Exp as ExplorerPanel
     participant Bar as TabBar
-    participant Host as EditorHost
+    participant Host as ItemRendererHost
     participant Router as URL
 
     User->>Exp: Click "checkout.ts" under Primary root
@@ -520,7 +520,7 @@ sequenceDiagram
 | Click Type group header | Click `Notebooks`, `Files`, or `Datasets` row | Toggles `group:<type>` in `useExplorerStore.collapsed` (persisted in `localStorage`) |
 | Click a breadcrumb parent | Click `Storefront Core` in top breadcrumbs | Calls `useExplorerContract` `revealItems` to un-collapse it in Explorer |
 | Keyboard tab switching | Focus active tab, press `ArrowLeft` / `ArrowRight` / `Home` / `End` | Moves focus and activates tabs across `[Primary, ...openTabs]` with roving `tabIndex` |
-| Deep-link invalid `?item=` | Visit `/workspaces/acme?item=folder:src` or `?item=bad` | Malformed syntax (`bad`) is stripped by `validateDetailSearch`; well-formed unknown/non-rendered keys (`folder:src`) are **not** persisted to `localStorage`, and `EditorHost` displays an inline `"not in this workspace"` / `"No renderer registered"` message |
+| Deep-link invalid `?item=` | Visit `/workspaces/acme?item=folder:src` or `?item=bad` | Malformed syntax (`bad`) is stripped by `validateDetailSearch`; well-formed unknown/non-rendered keys (`folder:src`) are **not** persisted to `localStorage`, and `ItemRendererHost` displays an inline `"not in this workspace"` / `"No renderer registered"` message |
 
 ---
 
@@ -543,7 +543,7 @@ sequenceDiagram
     User->>Crumbs: Select "Globex" in workspace switcher
     Crumbs->>Store: getState().lastActive["globex"]
     Crumbs->>Router: navigate(/workspaces/globex, item=lastActive, panels retained)
-    Note over Router: EditorHost keys by "globex:..." (zero state leak from Acme)
+    Note over Router: ItemRendererHost keys by "globex:..." (zero state leak from Acme)
     Note over Router: AgentPanel switches to history["globex"] (Acme chat preserved)
 
     User->>Bar: Click "Reports" icon
@@ -562,7 +562,7 @@ sequenceDiagram
 | Switch workspace | Change `<select>` in breadcrumbs | Keeps `?panels=` open (`retainSearchParams`), lands on target workspace's `lastActive` tab (or pinned Primary tab); `AgentPanel` keeps separate `history[wsId]` |
 | Return to area | Click unselected `Workspaces` or `Reports` icon | Restores exact `lastHref` (including search params or `/reports/q1`) |
 | Go up inside area | Click already-selected `Workspaces` icon while inside `/workspaces/acme` | Navigates up to `/workspaces` list |
-| Workspace isolation | Switch `Acme` <-> `Globex` | `EditorHost` keys `Activity` by `${workspace.id}:${key}`, preventing cross-workspace file leaks (note: unsaved edits in `Acme` unmount on workspace switch) |
+| Workspace isolation | Switch `Acme` <-> `Globex` | `ItemRendererHost` keys `Activity` by `${workspace.id}:${key}`, preventing cross-workspace file leaks (note: unsaved edits in `Acme` unmount on workspace switch) |
 
 ---
 
@@ -628,7 +628,7 @@ To add a brand-new plugin, export it with `definePlugin(...)` from `src/features
 | Goal | What to change |
 | --- | --- |
 | Share state/actions with other plugins | Export `createPluginBridge<Snapshot, Actions>()` from `src/features/<name>/contract.ts` (follow `src/features/explorer/contract.ts`). Other features import `@/features/<name>/contract`. |
-| Add a new Explorer item renderer | Add `{ type, label, pluralLabel?, icon, component: lazy(...) }` to `itemRenderers` in a plugin (`src/features/notebook/plugin.ts`). `ExplorerPanel`, `TabBar`, and `EditorHost` pick it up automatically. |
+| Add a new Explorer item renderer | Add `{ type, label, pluralLabel?, icon, component: lazy(...) }` to `itemRenderers` in a plugin (`src/features/notebook/plugin.ts`). `ExplorerPanel`, `TabBar`, and `ItemRendererHost` pick it up automatically. |
 | Customize or swap the pinned Primary renderer | Update or replace `src/features/primary/plugin.ts` (`type: 'primary'`). Its `component` receives `{ workspace, item }` (`item === undefined` before selection) and calls `useWorkspaceContract.getState().actions?.setPrimaryItem(...)` when selected. |
 | Add a new sidebar panel + toggle button | Add a `panels` entry (`container: 'workspace.detail'`) and an `activities` entry with `action: { kind: 'togglePanel', panelId }`. |
 | Add a standalone plugin page | Add an `activities` entry with `action: { kind: 'route', to: '/<id>', page: lazy(...) }`. No file in `src/routes/` needed. |
@@ -654,8 +654,8 @@ export interface ItemRenderer {
 }
 ```
 
-- **Pinned Primary renderer (`src/features/primary/plugin.ts`):** Registers `type: 'primary'` -> `PrimaryKeyComponent`. `EditorHost` mounts it in the pinned first tab (`?item=` omitted). When `item === undefined` (new workspace), `PrimaryKeyComponent` renders `PrimaryKeySelector` and signals selection via `useWorkspaceContract.getState().actions?.setPrimaryItem(...)`; when `item !== undefined`, it renders `PrimaryKeyDetail`. Neither `workspace` nor `explorer` knows how `PrimaryKeyComponent` renders its internal states.
-- **Standalone feature renderer (`src/features/notebook/plugin.ts`):** Registers `type: 'notebook'` -> `NotebookEditor` (`pluralLabel: 'Notebooks'`). `ExplorerPanel` groups top-level notebooks under **Notebooks**, `TabBar` renders the tab icon, and `EditorHost` lazy-loads `NotebookEditor` inside `<Activity>` so cell outputs survive tab switches.
+- **Pinned Primary renderer (`src/features/primary/plugin.ts`):** Registers `type: 'primary'` -> `PrimaryKeyComponent`. `ItemRendererHost` mounts it in the pinned first tab (`?item=` omitted). When `item === undefined` (new workspace), `PrimaryKeyComponent` renders `PrimaryKeySelector` and signals selection via `useWorkspaceContract.getState().actions?.setPrimaryItem(...)`; when `item !== undefined`, it renders `PrimaryKeyDetail`. Neither `workspace` nor `explorer` knows how `PrimaryKeyComponent` renders its internal states.
+- **Standalone feature renderer (`src/features/notebook/plugin.ts`):** Registers `type: 'notebook'` -> `NotebookEditor` (`pluralLabel: 'Notebooks'`). `ExplorerPanel` groups top-level notebooks under **Notebooks**, `TabBar` renders the tab icon, and `ItemRendererHost` lazy-loads `NotebookEditor` inside `<Activity>` so cell outputs survive tab switches.
 - **Core lightweight viewers & grouping nodes (`src/features/workspace/plugin.ts`):** Registers `file` (`FileEditor`), `dataset` (`DatasetEditor`), and `folder` (`component` omitted—any item with `parentId` children gets a collapsible chevron in Explorer, and clicking an item without a `component` toggles expand/collapse). Unregistered backend item types fall back cleanly into Explorer's **Other** group.
 
 ---
