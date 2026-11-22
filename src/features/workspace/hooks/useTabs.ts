@@ -26,6 +26,7 @@ const currentUrlItem = (router: AnyRouter): string | undefined =>
 const trimTrailingSlash = (path: string): string => (path.length > 1 ? path.replace(/\/+$/, '') : path);
 
 export interface TabController {
+  isActiveWorkspace(wsId: string): boolean;
   showDetails(): boolean;
   activateKey(key: string): boolean;
   closeKey(key: string): boolean;
@@ -43,6 +44,8 @@ export function createTabController(
     if (!ws || trimTrailingSlash(router.state.location.pathname) !== `/workspaces/${ws.id}`) return null;
     return ws;
   };
+
+  const isActiveWorkspace = (wsId: string): boolean => activeWorkspace()?.id === wsId;
 
   const showDetails = (): boolean => {
     const ws = activeWorkspace();
@@ -99,7 +102,7 @@ export function createTabController(
     return closeKey(itemKey(item.type, item.id));
   };
 
-  return { showDetails, activateKey, closeKey, openItemById, closeItemById };
+  return { isActiveWorkspace, showDetails, activateKey, closeKey, openItemById, closeItemById };
 }
 
 export function useTabActions(workspace: WorkspaceInfo | null): TabController {

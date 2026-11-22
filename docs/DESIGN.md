@@ -272,7 +272,7 @@ Plugins never import another plugin's internal files (`stores/`, `components/`, 
 | --- | --- | --- | --- |
 | **`useShellLocation()`** | `@/lib/plugin-system` | Always | `{ path, container, panels }` — current URL path, active container ID (e.g. `'workspace.detail'`), and open optional `?panels=` |
 | **`useRegistry()`** | `@/lib/plugin-system` | Always | Boot-time plugin contributions: `plugins`, `activity`, `panel`, `itemType`, `panelsFor(container)`, `activeRouteActivity(path)` |
-| **`useWorkspaceContract`** | `@/features/workspace/contract` | On `/workspaces/new` & `/workspaces/$wsId` (`null` elsewhere) | `current`: `{ workspace, isDraft, activeKey, activeItem, openItems }`<br>`actions`: `{ showDetails(), openItem(itemId), closeItem(itemId) }` |
+| **`useWorkspaceContract`** | `@/features/workspace/contract` | On `/workspaces/new` & `/workspaces/$wsId` (`null` elsewhere) | `current`: `{ workspace, isDraft, activeKey, activeItem, openItems }`<br>`actions`: `{ isActiveWorkspace(wsId), showDetails(), openItem(itemId), closeItem(itemId) }` |
 | **`useExplorerContract`** | `@/features/explorer/contract` | While `ExplorerPanel` is mounted (`null` if unloaded/unmounted) | `current`: `{ workspaceId, collapsedIds }`<br>`actions`: `{ revealItems(wsId, nodeIds), collapseAll(), expandAll() }` |
 | **`resetAllPersisted()`** | `@/stores/persist` | Always | Resets all registered persisted stores (`ide:*`) and shell `lastHref` in memory |
 
@@ -314,7 +314,7 @@ Follow **three rules** to prevent unnecessary re-renders and handle optional plu
    // Async handler — snapshot before await, verify still in workspace after await:
    const asked = useWorkspaceContract.getState().current;
    const reply = await myAsyncTask(asked);
-   if (useWorkspaceContract.getState().current?.workspace?.id === asked?.workspace?.id) {
+   if (asked?.workspace && useWorkspaceContract.getState().actions?.isActiveWorkspace(asked.workspace.id)) {
      useWorkspaceContract.getState().actions?.openItem('utils');
    }
    ```
@@ -355,10 +355,14 @@ useLayoutEffect(() => {
 
 useLayoutEffect(() => {
   setActions({ setFilter });
+}, [setFilter, setActions]);
+
+// Keep `clear()` in its own unmount-only effect so updating `actions` never wipes `current`:
+useLayoutEffect(() => {
   return () => {
     clear();
   };
-}, [setFilter, setActions, clear]);
+}, [clear]);
 ```
 
 ---
@@ -369,7 +373,7 @@ useLayoutEffect(() => {
 
 ```mermaid
 flowchart LR
-    Plugins["src/app/plugins.ts (6 plugins)"] --> Create["createRegistry(plugins)"]
+    Plugins["src/app/plugins.ts"] --> Create["createRegistry(plugins)"]
     Create --> CheckIds["Check unique activity, panel, itemType IDs"]
     Create --> CheckOrder["Check unique order per position and container"]
     CheckOrder --> CheckRefs["Check togglePanel targets and plugin page routes"]

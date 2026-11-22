@@ -12,7 +12,7 @@ import { ChevronDown, ChevronRight, File } from 'lucide-react';
 import { EMPTY, itemKey, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
 import { useWorkspaceContract } from '@/features/workspace/contract';
 import { useExplorerContract } from '../contract';
-import { ancestorContainerIds, buildExplorerTree } from '../lib/tree';
+import { ancestorContainerIds, buildExplorerTree, OTHER_GROUP_ID } from '../lib/tree';
 import { useExplorerStore } from '../stores/explorer-store';
 
 export default function ExplorerPanel() {
@@ -64,9 +64,9 @@ function SavedExplorer({ workspace }: { workspace: WorkspaceInfo }) {
   // Auto-reveal ancestor folders/group whenever the active tab changes (including deep links & Agent opens).
   useLayoutEffect(() => {
     if (!activeItem) return;
-    const toReveal = ancestorContainerIds(tree.byId, tree.primaryRoots, activeItem);
+    const toReveal = ancestorContainerIds(tree.byId, tree.primaryRoots, registry.itemType, activeItem);
     revealItems(workspace.id, toReveal);
-  }, [workspace.id, activeItem, tree.byId, tree.primaryRoots, revealItems]);
+  }, [workspace.id, activeItem, tree.byId, tree.primaryRoots, registry.itemType, revealItems]);
 
   useLayoutEffect(() => {
     setSnapshot({ workspaceId: workspace.id, collapsedIds: collapsed });
@@ -85,10 +85,14 @@ function SavedExplorer({ workspace }: { workspace: WorkspaceInfo }) {
         return true;
       },
     });
+  }, [revealItems, collapseAllInStore, expandWorkspace, setActions]);
+
+  // Separate unmount-only effect so updating `actions` never clears `current`.
+  useLayoutEffect(() => {
     return () => {
       clear();
     };
-  }, [revealItems, collapseAllInStore, expandWorkspace, setActions, clear]);
+  }, [clear]);
 
   const renderNode = (item: Item, depth: number, extraClass = '') => {
     const type = registry.itemType.get(item.type);
@@ -191,6 +195,28 @@ function SavedExplorer({ workspace }: { workspace: WorkspaceInfo }) {
           </li>
         );
       })}
+
+      {tree.unknownItems.length > 0 && (
+        <li key={OTHER_GROUP_ID}>
+          <button
+            type="button"
+            className="tree-row type-group"
+            style={{ paddingLeft: 8 }}
+            aria-expanded={!collapsed.includes(OTHER_GROUP_ID)}
+            onClick={() => toggleNode(workspace.id, OTHER_GROUP_ID)}
+          >
+            <span className="chev" aria-hidden="true">
+              {!collapsed.includes(OTHER_GROUP_ID) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </span>
+            <File size={14} />
+            <span>Other</span>
+            <span className="tree-count">{tree.unknownItems.length}</span>
+          </button>
+          {!collapsed.includes(OTHER_GROUP_ID) && (
+            <ul role="list">{tree.unknownItems.map((item) => renderNode(item, 1))}</ul>
+          )}
+        </li>
+      )}
     </ul>
   );
 }

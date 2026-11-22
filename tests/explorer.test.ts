@@ -42,6 +42,19 @@ describe('explorer tree & store', () => {
       tree.leafTypes.map((t) => t.type),
       ['file', 'dataset'],
     );
+    assert.deepEqual(tree.unknownItems, []);
+  });
+
+  it('collects root items of unregistered types into unknownItems so they do not vanish from Explorer', () => {
+    const items: Item[] = [
+      { id: 'u1', type: 'file', name: 'utils.ts', parentId: null },
+      { id: 'nb1', type: 'unregistered-nb', name: 'revenue.nb', parentId: null },
+    ];
+    const tree = buildExplorerTree(items, itemTypes);
+    assert.deepEqual(
+      tree.unknownItems.map((i) => i.name),
+      ['revenue.nb'],
+    );
   });
 
   it('toggles, collapses all, reveals paths, and resets with resetAllPersisted', () => {

@@ -1,17 +1,40 @@
 // Custom renderer registered for `item.type === 'notebook'` by `example.notebook`.
-// Kept mounted inside `<Activity>` by `EditorHost`, so cell run outputs survive tab switches.
+//   • Cells carry explicit `id` and `kind: 'markdown' | 'code'` so keys/run-counts stay
+//     tied to cell identity and `#` comments in code cells are never misread as markdown.
+//   • Kept mounted inside `<Activity>` by `EditorHost`, so simulated run counts survive tab switches.
 import { useState } from 'react';
 import { Play } from 'lucide-react';
 import type { EditorProps } from '@/lib/plugin-system';
 
-export default function NotebookEditor({ workspace, item }: EditorProps) {
-  const cells = (item.content ?? '')
-    .trim()
-    .split(/\n---\n/)
-    .map((block) => block.trim())
-    .filter(Boolean);
+interface NotebookCell {
+  readonly id: string;
+  readonly kind: 'markdown' | 'code';
+  readonly source: string;
+}
 
-  const [runs, setRuns] = useState<Record<number, number>>({});
+function parseCells(raw: string | undefined): NotebookCell[] {
+  if (!raw?.trim()) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (c): c is NotebookCell =>
+          typeof c === 'object' &&
+          c !== null &&
+          typeof (c as NotebookCell).id === 'string' &&
+          ((c as NotebookCell).kind === 'markdown' || (c as NotebookCell).kind === 'code') &&
+          typeof (c as NotebookCell).source === 'string',
+      );
+    }
+  } catch {
+    /* Fall back to single code cell when content is plain text */
+  }
+  return [{ id: 'cell-1', kind: 'code', source: raw }];
+}
+
+export default function NotebookEditor({ workspace, item }: EditorProps) {
+  const cells = parseCells(item.content);
+  const [runs, setRuns] = useState<Record<string, number>>({});
 
   return (
     <div className="notebook">
@@ -21,34 +44,32 @@ export default function NotebookEditor({ workspace, item }: EditorProps) {
       </header>
 
       <div className="notebook-cells">
-        {cells.map((cell, index) => {
-          const isMarkdown = cell.startsWith('#');
-          const runCount = runs[index] ?? 0;
-
-          if (isMarkdown) {
+        {cells.map((cell) => {
+          if (cell.kind === 'markdown') {
             return (
-              <div key={index} className="nb-cell markdown">
-                <p>{cell.replace(/^#+\s*/, '')}</p>
+              <div key={cell.id} className="nb-cell markdown">
+                <p>{cell.source}</p>
               </div>
             );
           }
 
+          const runCount = runs[cell.id] ?? 0;
           return (
-            <div key={index} className="nb-cell">
+            <div key={cell.id} className="nb-cell">
               <div className="nb-cell-bar">
                 <span className="hint">{runCount > 0 ? `In [${runCount}]` : 'In [ ]'}</span>
                 <button
                   type="button"
                   className="btn ghost nb-run"
-                  onClick={() => setRuns((prev) => ({ ...prev, [index]: (prev[index] ?? 0) + 1 }))}
+                  onClick={() => setRuns((prev) => ({ ...prev, [cell.id]: (prev[cell.id] ?? 0) + 1 }))}
                 >
                   <Play size={11} aria-hidden="true" />
                   Run cell
                 </button>
               </div>
-              <pre className="nb-code">{cell}</pre>
+              <pre className="nb-code">{cell.source}</pre>
               {runCount > 0 && (
-                <output className="nb-out">{`✓ Executed (${runCount}x) — output kept alive across tab switches`}</output>
+                <output className="nb-out">{`(demo) Simulated run #${runCount} — state kept alive across tab switches`}</output>
               )}
             </div>
           );

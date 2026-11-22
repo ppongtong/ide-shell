@@ -2,8 +2,8 @@
 // Publishes the active workspace (or draft state on `/workspaces/new`)
 // and tab actions to `@/features/workspace/contract`.
 //   • Uses `useLayoutEffect` so Explorer/Agent never lag the screen by 1 frame.
-//   • Registers `actions` once per mount, reading the latest workspace directly
-//     from `useWorkspaceContract.getState().current?.workspace`.
+//   • Separates snapshot, actions, and unmount cleanup into independent effects
+//     so updating one never clears the other.
 // ─────────────────────────────────────────────────────────────
 import { useLayoutEffect } from 'react';
 import { useRouter } from '@tanstack/react-router';
@@ -48,12 +48,16 @@ export function useSyncWorkspaceContract(
       router,
     );
     setActions({
+      isActiveWorkspace: controller.isActiveWorkspace,
       showDetails: controller.showDetails,
       openItem: controller.openItemById,
       closeItem: controller.closeItemById,
     });
+  }, [registry, router, setActions]);
+
+  useLayoutEffect(() => {
     return () => {
       clear();
     };
-  }, [registry, router, setActions, clear]);
+  }, [clear]);
 }

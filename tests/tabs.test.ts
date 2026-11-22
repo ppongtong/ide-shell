@@ -102,6 +102,7 @@ describe('workspace tab controller', () => {
     const { router, calls } = createFakeRouter('/workspaces/globex', 'file:utils');
     const controller = createTabController(() => workspace, registry, router);
 
+    assert.equal(controller.isActiveWorkspace('acme'), false);
     assert.equal(controller.openItemById('app'), false);
     assert.equal(controller.closeItemById('utils'), false);
     assert.equal(controller.showDetails(), false);
@@ -117,6 +118,7 @@ describe('workspace tab controller', () => {
     const { router, calls } = createFakeRouter('/workspaces/acme/', undefined);
     const controller = createTabController(() => workspace, registry, router);
 
+    assert.equal(controller.isActiveWorkspace('acme'), true);
     assert.equal(controller.openItemById('app'), true);
     assert.deepEqual(calls, [{ item: 'file:app', replace: false }]);
   });
