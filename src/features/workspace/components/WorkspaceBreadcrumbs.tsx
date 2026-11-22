@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 import { Fragment, type ReactNode } from 'react';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
-import { parseItem, type Item } from '@/contracts/workspace';
+import { parseItem, type Item } from '@/lib/plugin-system';
 import { CrumbButton, CrumbSep, CrumbText } from '@/components/ui/Breadcrumb';
 import { pathTo, type Workspace, type WorkspaceSummary } from '../api/workspaces';
 import { useWorkbench } from '../stores/workbench';

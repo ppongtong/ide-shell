@@ -41,8 +41,7 @@ src/
     agent/                Agent button + Agent panel
     reports/              example plugin page with its own sub-views
     settings/             Settings button + page
-  lib/plugin-system/      generic plugin SDK: types, registry, ShellLocation, panel search params
-  contracts/              domain contracts built on lib/ (workspace.ts: Item, WorkspaceInfo, itemTypes)
+  lib/plugin-system/      the IDE plugin SDK: types, registry, ShellLocation, search-params
   stores/                 app-wide state & cross-feature bridges (shell-store, workspace-bridge, persist)
   components/ui/          reusable UI: ActivityBarButton, Breadcrumb, Modal, ResizableStack
   styles/
@@ -53,17 +52,16 @@ src/
 | Folder | May import | Must not import |
 | --- | --- | --- |
 | `app/` | anything | — |
-| `app/shell/` | lib, stores, components | features, routes, contracts |
-| `routes/` | a feature's `index.ts`, `app/shell`, lib, contracts | — |
-| `features/*` | lib, contracts, stores, components, its own folder (relative) | app, routes, **other features** |
-| `stores/` | lib, contracts | app, routes, features, components |
-| `contracts/` | lib | app, routes, features, stores, components |
+| `app/shell/` | lib, stores, components | features, routes |
+| `routes/` | a feature's `index.ts`, `app/shell`, lib | — |
+| `features/*` | lib, stores, components, its own folder (relative) | app, routes, **other features** |
+| `stores/` | lib | app, routes, features, components |
 | `lib/` | — | everything above it |
-| `components/` | — | app, routes, features, stores, contracts, lib |
+| `components/` | — | app, routes, features, stores, lib |
 
-Features talk to each other only through `lib/plugin-system` (generic registry), `contracts/` (shared domain types), and `stores/` (shared bridges). Examples:
+Features talk to each other only through `lib/plugin-system` (the IDE plugin SDK) and shared stores in `stores/`. Examples:
 
-- Sidebar panels take no props; `ExplorerPanel` reads its route loader and `AgentPanel` reads `stores/workspace-bridge.ts`.
+- Sidebar panels receive `{ workspace }` from `SidebarPanels`.
 - `WorkspaceDetailPage` syncs what is open, plus actions (`openItem`, `closeItem`), into `stores/workspace-bridge.ts` via `useSyncWorkspaceBridge`. `AgentPanel` reads it with `useWorkspaceBridge((s) => s.current)` for rendering and `useWorkspaceBridge.getState()` before and after `await`, so it acts on where the user is now without importing the workspace feature.
 
 ## React 19.x features used

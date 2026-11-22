@@ -1,11 +1,10 @@
 import { useRef, type KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
-import { useRegistry } from '@/lib/plugin-system';
-import { getItemTypes, parseItem, type WorkspaceInfo } from '@/contracts/workspace';
+import { parseItem, useRegistry, type WorkspaceInfo } from '@/lib/plugin-system';
 import { useTabs } from '../hooks/useTabs';
 
 export function TabBar({ workspace, activeKey }: { workspace: WorkspaceInfo; activeKey?: string }) {
-  const itemTypes = getItemTypes(useRegistry());
+  const registry = useRegistry();
   const tabs = useTabs(workspace.id, activeKey);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -31,7 +30,7 @@ export function TabBar({ workspace, activeKey }: { workspace: WorkspaceInfo; act
         const ref = parseItem(key);
         if (!ref) return null;
         const item = workspace.items.find((i) => i.id === ref.id && i.type === ref.type);
-        const Icon = itemTypes.get(ref.type)?.icon;
+        const Icon = registry.itemType.get(ref.type)?.icon;
         const active = key === activeKey;
         const focusable = active || (!activeKey && index === 0);
         const name = item?.name ?? key;

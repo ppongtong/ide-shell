@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { EditorProps } from '@/contracts/workspace';
+import type { EditorProps } from '@/lib/plugin-system';
 
 export default function FileEditor({ item }: EditorProps) {
   // Plain local state. EditorHost keeps this component mounted inside <Activity>,

@@ -2,20 +2,18 @@
 // behaviour come from registered item types.
 import { getRouteApi } from '@tanstack/react-router';
 import { ChevronDown, ChevronRight, File } from 'lucide-react';
-import { useRegistry } from '@/lib/plugin-system';
-import { getItemTypes, itemKey, type Item } from '@/contracts/workspace';
+import { itemKey, useRegistry, type Item, type PanelProps } from '@/lib/plugin-system';
 import { NONE, useWorkbench } from '../stores/workbench';
 import { useTabs } from '../hooks/useTabs';
 
 const route = getRouteApi('/workspaces/$wsId');
 
-export default function ExplorerPanel() {
-  const workspace = route.useLoaderData();
+export default function ExplorerPanel({ workspace }: PanelProps) {
   const { item: activeKey } = route.useSearch();
   const tabs = useTabs(workspace.id, activeKey);
   const expanded = useWorkbench((s) => s.expanded[workspace.id] ?? NONE);
-  const itemTypes = getItemTypes(useRegistry());
-  const isFolder = (i: Item) => !!itemTypes.get(i.type)?.isContainer;
+  const registry = useRegistry();
+  const isFolder = (i: Item) => !!registry.itemType.get(i.type)?.isContainer;
 
   // Group & sort once in O(N log N) instead of filtering all items per folder.
   const byParent = new Map<string | null, Item[]>();
@@ -29,7 +27,7 @@ export default function ExplorerPanel() {
   }
 
   const renderNode = (item: Item, depth: number) => {
-    const type = itemTypes.get(item.type);
+    const type = registry.itemType.get(item.type);
     const Icon = type?.icon ?? File;
     const open = expanded.includes(item.id);
     const active = itemKey(item.type, item.id) === activeKey;

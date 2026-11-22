@@ -95,6 +95,15 @@ describe('createRegistry', () => {
     assert.throws(
       () =>
         createRegistry([
+          { id: 'p1', itemTypes: [{ type: 'file', label: 'File', icon: Icon }] },
+          { id: 'p2', itemTypes: [{ type: 'file', label: 'Duplicate', icon: Icon }] },
+        ]),
+      /Duplicate item type "file"/,
+    );
+
+    assert.throws(
+      () =>
+        createRegistry([
           {
             id: 'p1',
             activities: [activity('agent', 20, { action: { kind: 'togglePanel', panelId: 'missing' } })],

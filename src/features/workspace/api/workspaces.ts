@@ -1,5 +1,5 @@
 // Mock backend. Swap the bodies for real fetch calls.
-import type { Item, WorkspaceInfo } from '@/contracts/workspace';
+import type { Item, WorkspaceInfo } from '@/lib/plugin-system';
 
 export interface Workspace extends WorkspaceInfo {
   readonly description: string;

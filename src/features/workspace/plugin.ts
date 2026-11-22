@@ -5,7 +5,6 @@
 import { lazy } from 'react';
 import { FileCode, Folder, FolderKanban, FolderPlus, Table } from 'lucide-react';
 import { definePlugin } from '@/lib/plugin-system';
-import { WORKSPACE_DETAIL_CONTAINER } from '@/contracts/workspace';
 import ExplorerPanel from './components/ExplorerPanel';
 
 export const workspacePlugin = definePlugin({
@@ -33,7 +32,7 @@ export const workspacePlugin = definePlugin({
     {
       id: 'explorer',
       title: 'Explorer',
-      container: WORKSPACE_DETAIL_CONTAINER,
+      container: 'workspace.detail',
       order: 10,
       alwaysOn: true,
       component: ExplorerPanel,

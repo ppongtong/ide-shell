@@ -3,7 +3,7 @@
 // sorted lists + lookup maps the rest of the app reads.
 // ─────────────────────────────────────────────────────────────
 import { createContext, use } from 'react';
-import type { Activity, Plugin, SidebarPanel } from './types';
+import type { Activity, ItemType, Plugin, SidebarPanel } from './types';
 
 export interface Registry {
   readonly plugins: readonly Plugin[];
@@ -11,11 +11,12 @@ export interface Registry {
   readonly bottomActivities: readonly Activity[];
   readonly activity: ReadonlyMap<string, Activity>;
   readonly panel: ReadonlyMap<string, SidebarPanel>;
+  readonly itemType: ReadonlyMap<string, ItemType>;
   /** Panels a container can show, in stack order. */
-  panelsFor(container: string): readonly SidebarPanel[];
+  panelsFor(container: SidebarPanel['container']): readonly SidebarPanel[];
 }
 
-const EMPTY_PANELS: readonly SidebarPanel[] = [];
+const EMPTY_PANELS: readonly SidebarPanel[] = Object.freeze([]);
 
 function indexById<T>(kind: string, list: readonly T[], key: (t: T) => string): Map<string, T> {
   const map = new Map<string, T>();
@@ -27,7 +28,7 @@ function indexById<T>(kind: string, list: readonly T[], key: (t: T) => string): 
   return map;
 }
 
-function assertUniqueOrder<T extends { id: string; order: number }>(
+function assertUniqueOrder<T extends { readonly id: string; readonly order: number }>(
   kind: string,
   list: readonly T[],
   groupOf: (t: T) => string,
@@ -47,9 +48,11 @@ function assertUniqueOrder<T extends { id: string; order: number }>(
 export function createRegistry(plugins: readonly Plugin[]): Registry {
   const activities = plugins.flatMap((p) => p.activities ?? []);
   const panels = plugins.flatMap((p) => p.panels ?? []);
+  const itemTypes = plugins.flatMap((p) => p.itemTypes ?? []);
 
   const activity = indexById('activity', activities, (a) => a.id);
   const panel = indexById('panel', panels, (p) => p.id);
+  const itemType = indexById('item type', itemTypes, (t) => t.type);
 
   // Fail at boot, not at first click.
   assertUniqueOrder('activity', activities, (a) => a.position ?? 'top');
@@ -62,10 +65,10 @@ export function createRegistry(plugins: readonly Plugin[]): Registry {
       throw new Error(`Plugin page activity "${a.id}" must use to: "/${a.id}"`);
   }
 
-  const byOrder = (x: { order: number; id: string }, y: { order: number; id: string }) =>
+  const byOrder = (x: { readonly order: number; readonly id: string }, y: { readonly order: number; readonly id: string }) =>
     x.order - y.order || x.id.localeCompare(y.id);
 
-  const panelsByContainer = new Map<string, SidebarPanel[]>();
+  const panelsByContainer = new Map<SidebarPanel['container'], SidebarPanel[]>();
   for (const p of panels) {
     const bucket = panelsByContainer.get(p.container);
     if (bucket) bucket.push(p);
@@ -79,6 +82,7 @@ export function createRegistry(plugins: readonly Plugin[]): Registry {
     bottomActivities: activities.filter((a) => a.position === 'bottom').sort(byOrder),
     activity,
     panel,
+    itemType,
     panelsFor: (container) => panelsByContainer.get(container) ?? EMPTY_PANELS,
   };
 }

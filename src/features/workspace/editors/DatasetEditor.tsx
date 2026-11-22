@@ -1,4 +1,4 @@
-import type { EditorProps } from '@/contracts/workspace';
+import type { EditorProps } from '@/lib/plugin-system';
 
 export default function DatasetEditor({ item }: EditorProps) {
   const [header = [], ...rows] = (item.content ?? '')

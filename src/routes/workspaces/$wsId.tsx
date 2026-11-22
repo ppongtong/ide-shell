@@ -1,6 +1,6 @@
 // /workspaces/$wsId?item=file:utils&panels=agent
 import { createFileRoute, retainSearchParams } from '@tanstack/react-router';
-import { validateDetailSearch } from '@/contracts/workspace';
+import { validateDetailSearch } from '@/lib/plugin-system';
 import { WorkspaceBreadcrumbs, WorkspaceDetailPage, workspacesApi } from '@/features/workspace';
 
 export const Route = createFileRoute('/workspaces/$wsId')({
