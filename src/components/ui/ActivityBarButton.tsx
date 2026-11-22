@@ -17,6 +17,7 @@ interface Props {
 export function ActivityBarButton({ title, icon: Icon, state, disabled, disabledReason, role, onClick }: Props) {
   return (
     <button
+      type="button"
       className={`act ${state}`}
       title={disabled && disabledReason ? `${title} (${disabledReason})` : title}
       aria-label={title}

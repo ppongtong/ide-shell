@@ -12,7 +12,3 @@ declare module '@tanstack/react-router' {
     Breadcrumbs?: ComponentType<{ match: AnyRouteMatch }>;
   }
 }
-
-export interface RouterContext {
-  registry: Registry;
-}

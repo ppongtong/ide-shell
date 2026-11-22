@@ -14,8 +14,8 @@ export interface StackSection {
 }
 
 interface Props {
-  sections: StackSection[];
-  sizes: Record<string, number>;
+  sections: readonly StackSection[];
+  sizes: Readonly<Record<string, number>>;
   onResize(sizes: Record<string, number>): void;
   /** Move focus into a section when it goes from hidden to visible. */
   focusOnShow?: boolean;

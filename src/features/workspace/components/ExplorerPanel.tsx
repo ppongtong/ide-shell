@@ -68,4 +68,4 @@ export default function ExplorerPanel() {
   );
 }
 
-const NONE_ITEMS: Item[] = [];
+const NONE_ITEMS: readonly Item[] = Object.freeze([]);

@@ -6,16 +6,18 @@ import { createContext, use } from 'react';
 import type { Activity, Plugin, SidebarPanel } from './types';
 
 export interface Registry {
-  plugins: Plugin[];
-  topActivities: Activity[];
-  bottomActivities: Activity[];
-  activity: Map<string, Activity>;
-  panel: Map<string, SidebarPanel>;
+  readonly plugins: readonly Plugin[];
+  readonly topActivities: readonly Activity[];
+  readonly bottomActivities: readonly Activity[];
+  readonly activity: ReadonlyMap<string, Activity>;
+  readonly panel: ReadonlyMap<string, SidebarPanel>;
   /** Panels a container can show, in stack order. */
-  panelsFor(container: string): SidebarPanel[];
+  panelsFor(container: string): readonly SidebarPanel[];
 }
 
-export function indexById<T>(kind: string, list: T[], key: (t: T) => string): Map<string, T> {
+const EMPTY_PANELS: readonly SidebarPanel[] = [];
+
+function indexById<T>(kind: string, list: readonly T[], key: (t: T) => string): Map<string, T> {
   const map = new Map<string, T>();
   for (const t of list) {
     const k = key(t);
@@ -27,7 +29,7 @@ export function indexById<T>(kind: string, list: T[], key: (t: T) => string): Ma
 
 function assertUniqueOrder<T extends { id: string; order: number }>(
   kind: string,
-  list: T[],
+  list: readonly T[],
   groupOf: (t: T) => string,
 ) {
   const seen = new Map<string, string>();
@@ -42,7 +44,7 @@ function assertUniqueOrder<T extends { id: string; order: number }>(
   }
 }
 
-export function createRegistry(plugins: Plugin[]): Registry {
+export function createRegistry(plugins: readonly Plugin[]): Registry {
   const activities = plugins.flatMap((p) => p.activities ?? []);
   const panels = plugins.flatMap((p) => p.panels ?? []);
 
@@ -63,13 +65,21 @@ export function createRegistry(plugins: Plugin[]): Registry {
   const byOrder = (x: { order: number; id: string }, y: { order: number; id: string }) =>
     x.order - y.order || x.id.localeCompare(y.id);
 
+  const panelsByContainer = new Map<string, SidebarPanel[]>();
+  for (const p of panels) {
+    const bucket = panelsByContainer.get(p.container);
+    if (bucket) bucket.push(p);
+    else panelsByContainer.set(p.container, [p]);
+  }
+  for (const bucket of panelsByContainer.values()) bucket.sort(byOrder);
+
   return {
-    plugins,
+    plugins: [...plugins],
     topActivities: activities.filter((a) => a.position !== 'bottom').sort(byOrder),
     bottomActivities: activities.filter((a) => a.position === 'bottom').sort(byOrder),
     activity,
     panel,
-    panelsFor: (container) => panels.filter((p) => p.container === container).sort(byOrder),
+    panelsFor: (container) => panelsByContainer.get(container) ?? EMPTY_PANELS,
   };
 }
 

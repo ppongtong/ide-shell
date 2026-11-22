@@ -23,7 +23,7 @@ TypeScript is pinned to 6.0 because typescript-eslint does not support TypeScrip
 src/
   app/                    startup wiring + the IDE frame
     main.tsx              render <AppProvider><RouterProvider/></AppProvider>
-    router.ts             createRouter({ routeTree, context: { registry } })
+    router.ts             createRouter({ routeTree })
     plugins.ts            the one list of features to load
     app-registry.tsx      createRegistry(plugins) + <AppProvider>
     shell/                Shell, ActivityBar, Breadcrumbs, DialogHost, PluginPageHost

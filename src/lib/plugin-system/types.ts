@@ -10,30 +10,30 @@ export type Lazy<P = Record<string, never>> = LazyExoticComponent<ComponentType<
 
 /** "Where am I", derived generically from the matched route and ?panels= param. */
 export interface ShellLocation {
-  path: string;
+  readonly path: string;
   /** Matched leaf route id, e.g. '/workspaces/$wsId', '/settings', '/$activityId/$'. */
-  routeId?: string;
+  readonly routeId?: string;
   /** Extra sidebar panels switched on via ?panels=, e.g. ['agent']. */
-  panels: string[];
+  readonly panels: readonly string[];
 }
 
 // ── Activities (activity-bar buttons) ───────────────────────
 
 /** Go to: selects an area. Highlight "selected" (accent bar). Only one at a time. */
 export interface RouteAction {
-  kind: 'route';
+  readonly kind: 'route';
   /** Home of this area, e.g. '/workspaces'. Plugin pages must use `/${activity.id}`. */
-  to: string;
+  readonly to: string;
   /** Plugin-hosted page rendered under /$activityId/$ */
-  page?: Lazy<{ subPath: string }>;
+  readonly page?: Lazy<{ subPath: string }>;
   /** From another area, return to the last URL inside this one. */
-  rememberLastLocation?: boolean;
+  readonly rememberLastLocation?: boolean;
 }
 
 /** Show/hide: a sidebar panel. Highlight "on" (filled). Can be on next to a selected route. */
 export interface TogglePanelAction {
-  kind: 'togglePanel';
-  panelId: string;
+  readonly kind: 'togglePanel';
+  readonly panelId: string;
 }
 
 export interface DialogProps {
@@ -43,37 +43,37 @@ export interface DialogProps {
 
 /** Action: opens a dialog. No highlight; focus returns to the button on close. */
 export interface DialogAction {
-  kind: 'dialog';
-  dialog: Lazy<DialogProps>;
+  readonly kind: 'dialog';
+  readonly dialog: Lazy<DialogProps>;
 }
 
 export interface Activity {
-  id: string;
-  title: string;
-  icon: Icon;
+  readonly id: string;
+  readonly title: string;
+  readonly icon: Icon;
   /** Sort order inside its group (top or bottom). */
-  order: number;
-  position?: 'top' | 'bottom';
+  readonly order: number;
+  readonly position?: 'top' | 'bottom';
   /** false → shown but disabled */
-  enabledWhen?: (location: ShellLocation) => boolean;
+  readonly enabledWhen?: (location: ShellLocation) => boolean;
   /** Tooltip suffix shown when `enabledWhen` returns false. */
-  disabledReason?: string;
-  action: RouteAction | TogglePanelAction | DialogAction;
+  readonly disabledReason?: string;
+  readonly action: RouteAction | TogglePanelAction | DialogAction;
 }
 
 // ── Sidebar panels (generic container slots) ───────────────
 
 export interface SidebarPanel {
-  id: string;
-  title: string;
+  readonly id: string;
+  readonly title: string;
   /** Identifier of the host container (typically a route id, e.g. '/workspaces/$wsId'). */
-  container: string;
+  readonly container: string;
   /** Top-to-bottom order in the stack. */
-  order: number;
+  readonly order: number;
   /** Always shown. Others appear when toggled on via ?panels= */
-  alwaysOn?: boolean;
+  readonly alwaysOn?: boolean;
   /** Panels read their host context from route loaders or shared bridge stores. */
-  component: Lazy;
+  readonly component: Lazy;
 }
 
 // ── Plugin ──────────────────────────────────────────────────
@@ -85,10 +85,10 @@ export interface SidebarPanel {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface PluginContributions {}
 
-export interface Plugin extends Partial<PluginContributions> {
-  id: string;
-  activities?: Activity[];
-  panels?: SidebarPanel[];
+export interface Plugin extends Readonly<Partial<PluginContributions>> {
+  readonly id: string;
+  readonly activities?: readonly Activity[];
+  readonly panels?: readonly SidebarPanel[];
 }
 
 /** Identity helper for autocomplete and type checks. */

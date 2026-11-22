@@ -3,9 +3,9 @@ import { create } from 'zustand';
 
 interface ShellState {
   /** Activity whose dialog is open. Not in the URL: Back should not reopen a dialog. */
-  openDialog: string | null;
+  readonly openDialog: string | null;
   /** Last URL visited inside each route activity (for rememberLastLocation). */
-  lastHref: Record<string, string>;
+  readonly lastHref: Readonly<Record<string, string>>;
 
   showDialog(activityId: string): void;
   hideDialog(): void;

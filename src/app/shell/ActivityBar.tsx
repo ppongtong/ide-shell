@@ -16,7 +16,7 @@ import {
 import { ActivityBarButton, type ActivityButtonState } from '@/components/ui/ActivityBarButton';
 import { useShell } from '@/stores/shell-store';
 
-export function activityState(a: Activity, loc: ShellLocation): ActivityButtonState {
+function activityState(a: Activity, loc: ShellLocation): ActivityButtonState {
   switch (a.action.kind) {
     case 'route':
       return inArea(loc.path, a.action.to) ? 'selected' : 'off';

@@ -10,11 +10,11 @@ import { create } from 'zustand';
 import type { Item, WorkspaceInfo } from '@/contracts/workspace';
 
 export interface WorkspaceSnapshot {
-  workspace: WorkspaceInfo;
+  readonly workspace: WorkspaceInfo;
   /** Item of the active tab. */
-  activeItem?: Item;
+  readonly activeItem?: Item;
   /** Items open in tabs, in tab order. */
-  openItems: Item[];
+  readonly openItems: readonly Item[];
 }
 
 /** Each action returns false when it could not do anything (unknown item, tab not open). */
@@ -26,8 +26,8 @@ export interface WorkspaceActions {
 }
 
 interface WorkspaceBridgeState {
-  current: WorkspaceSnapshot | null;
-  actions: WorkspaceActions | null;
+  readonly current: WorkspaceSnapshot | null;
+  readonly actions: WorkspaceActions | null;
   setSnapshot(current: WorkspaceSnapshot): void;
   setActions(actions: WorkspaceActions): void;
   clearBridge(): void;

@@ -29,7 +29,7 @@ interface Msg {
   pending?: boolean;
 }
 
-const EMPTY_MSGS: Msg[] = [];
+const EMPTY_MSGS: readonly Msg[] = Object.freeze([]);
 
 export default function AgentPanel() {
   const current = useWorkspaceBridge((s) => s.current);

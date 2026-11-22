@@ -1,11 +1,8 @@
 // Mock backend. Swap the bodies for real fetch calls.
-import type { Item } from '@/contracts/workspace';
+import type { Item, WorkspaceInfo } from '@/contracts/workspace';
 
-export interface Workspace {
-  id: string;
-  name: string;
-  description: string;
-  items: Item[];
+export interface Workspace extends WorkspaceInfo {
+  readonly description: string;
 }
 export type WorkspaceSummary = Omit<Workspace, 'items'>;
 
@@ -98,7 +95,7 @@ export const workspacesApi = {
 };
 
 /** Walk parentId up to the root: [src, utils] for utils.ts */
-export function pathTo(items: Item[], id: string): Item[] {
+export function pathTo(items: readonly Item[], id: string): Item[] {
   const byId = new Map(items.map((i) => [i.id, i]));
   const chain: Item[] = [];
   for (let cur = byId.get(id); cur; cur = cur.parentId ? byId.get(cur.parentId) : undefined) chain.unshift(cur);

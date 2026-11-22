@@ -9,45 +9,45 @@ import type { Icon, Lazy, Registry } from '@/lib/plugin-system';
 export const WORKSPACE_DETAIL_CONTAINER = '/workspaces/$wsId' as const;
 
 export interface Item {
-  id: string;
-  type: string;
-  name: string;
-  parentId: string | null;
-  content?: string;
+  readonly id: string;
+  readonly type: string;
+  readonly name: string;
+  readonly parentId: string | null;
+  readonly content?: string;
 }
 
 export interface WorkspaceInfo {
-  id: string;
-  name: string;
-  items: Item[];
+  readonly id: string;
+  readonly name: string;
+  readonly items: readonly Item[];
 }
 
 export interface EditorProps {
-  workspace: WorkspaceInfo;
-  item: Item;
+  readonly workspace: WorkspaceInfo;
+  readonly item: Item;
 }
 
 export interface ItemType {
-  type: string;
-  label: string;
-  icon: Icon;
+  readonly type: string;
+  readonly label: string;
+  readonly icon: Icon;
   /** Folders expand/collapse instead of opening a tab. */
-  isContainer?: boolean;
+  readonly isContainer?: boolean;
   /** Rendered inside the tab. Omit for containers. */
-  editor?: Lazy<EditorProps>;
+  readonly editor?: Lazy<EditorProps>;
 }
 
 /** Plug `itemTypes` into the generic Plugin contract via module augmentation. */
 declare module '@/lib/plugin-system' {
   interface PluginContributions {
-    itemTypes: ItemType[];
+    itemTypes: readonly ItemType[];
   }
 }
 
 // Cached per Registry instance so indexing happens once.
-const itemTypeCache = new WeakMap<Registry, Map<string, ItemType>>();
+const itemTypeCache = new WeakMap<Registry, ReadonlyMap<string, ItemType>>();
 
-export function getItemTypes(registry: Registry): Map<string, ItemType> {
+export function getItemTypes(registry: Registry): ReadonlyMap<string, ItemType> {
   const cached = itemTypeCache.get(registry);
   if (cached) return cached;
 
@@ -67,13 +67,13 @@ export function getItemTypes(registry: Registry): Map<string, ItemType> {
 // ── Workspace detail URL search params (?item=file:utils&panels=agent) ──
 
 export interface DetailSearch {
-  item?: string;
-  panels?: string;
+  readonly item?: string;
+  readonly panels?: string;
 }
 
 export const itemKey = (type: string, id: string) => `${type}:${id}`;
 
-export function parseItem(key?: string): { type: string; id: string } | undefined {
+export function parseItem(key?: string): { readonly type: string; readonly id: string } | undefined {
   if (!key) return undefined;
   const i = key.indexOf(':');
   if (i <= 0 || i === key.length - 1) return undefined;

@@ -8,13 +8,13 @@ import { persistName, persistStorage, registerResetter } from '@/stores/persist'
 
 interface WorkbenchData {
   /** Open tab keys per workspace, in tab order: { acme: ['file:utils', 'dataset:sales'] } */
-  tabs: Record<string, string[]>;
+  readonly tabs: Readonly<Record<string, readonly string[]>>;
   /** Last active tab per workspace, so switching workspaces lands on it. */
-  lastActive: Record<string, string>;
+  readonly lastActive: Readonly<Record<string, string>>;
   /** Expanded folder ids per workspace. */
-  expanded: Record<string, string[]>;
+  readonly expanded: Readonly<Record<string, readonly string[]>>;
   /** Relative heights of stacked sidebar panels: { explorer: 1, agent: 1 } */
-  panelSizes: Record<string, number>;
+  readonly panelSizes: Readonly<Record<string, number>>;
 }
 
 interface WorkbenchState extends WorkbenchData {
@@ -81,4 +81,4 @@ export const useWorkbench = create<WorkbenchState>()(
 registerResetter(() => useWorkbench.setState(initialData));
 
 /** Zustand selectors must return a stable value; a new [] every render loops forever. */
-export const NONE: string[] = [];
+export const NONE: readonly string[] = Object.freeze([]);
