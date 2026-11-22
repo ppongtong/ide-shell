@@ -1,5 +1,5 @@
 // Workspace detail URL search validation & cached item indexing.
-import { itemKey, parseItem, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
+import { itemKey, parseItem, type Item, type ItemType, type WorkspaceInfo } from '@/lib/plugin-system';
 
 export interface DetailSearch {
   readonly item?: string;
@@ -33,4 +33,29 @@ export function indexItems(workspace: WorkspaceInfo): ItemIndex {
   const built: ItemIndex = { byId, byKey };
   indexCache.set(workspace.items, built);
   return built;
+}
+
+const openableCache = new WeakMap<ReadonlyMap<string, ItemType>, WeakMap<readonly Item[], ReadonlySet<string>>>();
+
+/** Cached set of `"type:id"` keys in `workspace` that are openable in tabs (non-containers). */
+export function openableKeys(
+  workspace: WorkspaceInfo,
+  itemTypes: ReadonlyMap<string, ItemType>,
+): ReadonlySet<string> {
+  let byItems = openableCache.get(itemTypes);
+  if (!byItems) {
+    byItems = new WeakMap();
+    openableCache.set(itemTypes, byItems);
+  }
+  const cached = byItems.get(workspace.items);
+  if (cached) return cached;
+
+  const set = new Set<string>();
+  for (const item of workspace.items) {
+    if (!itemTypes.get(item.type)?.isContainer) {
+      set.add(itemKey(item.type, item.id));
+    }
+  }
+  byItems.set(workspace.items, set);
+  return set;
 }

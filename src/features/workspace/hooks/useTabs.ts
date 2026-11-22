@@ -23,6 +23,8 @@ const goToTab = (router: AnyRouter, wsId: string, key: string | undefined, repla
 const currentUrlItem = (router: AnyRouter): string | undefined =>
   (router.state.location.search as { item?: string }).item;
 
+const trimTrailingSlash = (path: string): string => (path.length > 1 ? path.replace(/\/+$/, '') : path);
+
 export interface TabController {
   showDetails(): boolean;
   activateKey(key: string): boolean;
@@ -38,7 +40,7 @@ export function createTabController(
 ): TabController {
   const activeWorkspace = (): WorkspaceInfo | null => {
     const ws = getWorkspace();
-    if (!ws || router.state.location.pathname !== `/workspaces/${ws.id}`) return null;
+    if (!ws || trimTrailingSlash(router.state.location.pathname) !== `/workspaces/${ws.id}`) return null;
     return ws;
   };
 

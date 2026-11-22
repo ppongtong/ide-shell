@@ -109,4 +109,15 @@ describe('workspace tab controller', () => {
     // Tabs in acme were not mutated either
     assert.deepEqual(useWorkbench.getState().tabs['acme'], ['file:utils']);
   });
+
+  it('accepts a trailing slash on the current workspace pathname (/workspaces/acme/)', () => {
+    resetAllPersisted();
+    const registry = createRegistry([testPlugin]);
+
+    const { router, calls } = createFakeRouter('/workspaces/acme/', undefined);
+    const controller = createTabController(() => workspace, registry, router);
+
+    assert.equal(controller.openItemById('app'), true);
+    assert.deepEqual(calls, [{ item: 'file:app', replace: false }]);
+  });
 });

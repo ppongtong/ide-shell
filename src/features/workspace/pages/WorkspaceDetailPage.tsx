@@ -4,8 +4,8 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffectEvent, useLayoutEffect } from 'react';
 import { getRouteApi } from '@tanstack/react-router';
-import { EMPTY, itemKey, parsePanels, useRegistry } from '@/lib/plugin-system';
-import { indexItems } from '../lib/search';
+import { EMPTY, parsePanels, useRegistry } from '@/lib/plugin-system';
+import { indexItems, openableKeys } from '../lib/search';
 import { useWorkbench } from '../stores/workbench';
 import { useSyncWorkspaceContract } from '../hooks/useSyncWorkspaceContract';
 import { SidebarPanels } from '../components/SidebarPanels';
@@ -24,27 +24,21 @@ export function WorkspaceDetailPage() {
   const pruneTabs = useWorkbench((s) => s.pruneTabs);
 
   const { byKey } = indexItems(workspace);
-  const matchedItem = item ? byKey.get(item) : undefined;
-  const isOpenable = !!matchedItem && !registry.itemType.get(matchedItem.type)?.isContainer;
-  const activeItem = isOpenable ? matchedItem : undefined;
+  const validKeySet = openableKeys(workspace, registry.itemType);
+  const isOpenable = !!item && validKeySet.has(item);
+  const activeItem = isOpenable ? byKey.get(item) : undefined;
 
-  // Compute one canonical open-tab list so TabBar and EditorHost always match on deep links,
-  // while filtering out any stale persisted keys whose items were deleted.
-  const validStored = storedTabs.filter((k) => {
-    const it = byKey.get(k);
-    return !!it && !registry.itemType.get(it.type)?.isContainer;
-  });
-  const openKeys = isOpenable && item && !validStored.includes(item) ? [...validStored, item] : validStored;
+  // Compute one canonical open-tab list so TabBar and EditorHost always match on deep links.
+  const validStored = storedTabs.filter((k) => validKeySet.has(k));
+  const openKeys = isOpenable && !validStored.includes(item) ? [...validStored, item] : validStored;
 
-  // URL → store (before paint): prune vanished items and record valid deep-linked tabs.
-  const syncTabs = useEffectEvent((wsId: string, key: string | undefined, valid: boolean) => {
-    const validKeySet = new Set<string>();
-    for (const it of workspace.items) {
-      if (!registry.itemType.get(it.type)?.isContainer) {
-        validKeySet.add(itemKey(it.type, it.id));
-      }
-    }
-    pruneTabs(wsId, validKeySet);
+  // 1. Prune vanished/deleted items only when the workspace or its items change (not on tab clicks).
+  useLayoutEffect(() => {
+    pruneTabs(workspace.id, validKeySet);
+  }, [workspace.id, validKeySet, pruneTabs]);
+
+  // 2. Sync valid deep-linked or switched `?item=` into the persisted workbench store.
+  const syncActiveTab = useEffectEvent((wsId: string, key: string | undefined, valid: boolean) => {
     if (key && valid) {
       openTab(wsId, key);
     } else if (!key) {
@@ -52,11 +46,11 @@ export function WorkspaceDetailPage() {
     }
   });
   useLayoutEffect(() => {
-    syncTabs(workspace.id, item, isOpenable);
-  }, [workspace.id, workspace.items, item, isOpenable]);
+    syncActiveTab(workspace.id, item, isOpenable);
+  }, [workspace.id, item, isOpenable]);
 
-  // Publishes live workspace state & actions to `@/features/workspace/contract`.
-  useSyncWorkspaceContract(workspace, isOpenable ? item : undefined, activeItem);
+  // Pass raw `item` as `activeKey` so Explorer and TabBar stay consistent on unopenable `?item=` URLs.
+  useSyncWorkspaceContract(workspace, item, activeItem);
 
   return (
     <div className="ws-detail">

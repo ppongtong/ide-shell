@@ -2,9 +2,10 @@
 // Publishes the active workspace (or draft state on `/workspaces/new`)
 // and tab actions to `@/features/workspace/contract`.
 //   • Uses `useLayoutEffect` so Explorer/Agent never lag the screen by 1 frame.
-//   • Registers `actions` once per mount, reading the latest workspace via ref.
+//   • Registers `actions` once per mount, reading the latest workspace directly
+//     from `useWorkspaceContract.getState().current?.workspace`.
 // ─────────────────────────────────────────────────────────────
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect } from 'react';
 import { useRouter } from '@tanstack/react-router';
 import { EMPTY, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
 import { useWorkspaceContract } from '../contract';
@@ -24,11 +25,6 @@ export function useSyncWorkspaceContract(
   const setActions = useWorkspaceContract((s) => s.setActions);
   const clear = useWorkspaceContract((s) => s.clear);
 
-  const workspaceRef = useRef<WorkspaceInfo | null>(workspace);
-  useLayoutEffect(() => {
-    workspaceRef.current = workspace;
-  }, [workspace]);
-
   useLayoutEffect(() => {
     if (!workspace) {
       setSnapshot({ workspace: null, isDraft: true, openItems: EMPTY });
@@ -46,7 +42,11 @@ export function useSyncWorkspaceContract(
   }, [workspace, activeKey, activeItem, openKeys, setSnapshot]);
 
   useLayoutEffect(() => {
-    const controller = createTabController(() => workspaceRef.current, registry, router);
+    const controller = createTabController(
+      () => useWorkspaceContract.getState().current?.workspace ?? null,
+      registry,
+      router,
+    );
     setActions({
       showDetails: controller.showDetails,
       openItem: controller.openItemById,

@@ -16,8 +16,9 @@ import {
   ViewTransition,
   type FormEvent,
 } from 'react';
+import { useRouter, type AnyRouter } from '@tanstack/react-router';
 import { Send } from 'lucide-react';
-import { EMPTY } from '@/lib/plugin-system';
+import { EMPTY, useRegistry, type ItemType } from '@/lib/plugin-system';
 import { useWorkspaceContract, type WorkspaceSnapshot } from '@/features/workspace/contract';
 import { useExplorerContract } from '@/features/explorer/contract';
 import { agentApi, type AgentAction } from '../api/agent';
@@ -29,40 +30,64 @@ interface Msg {
   pending?: boolean;
 }
 
-function runReplyAction(action: AgentAction): boolean {
+const trimSlash = (p: string) => (p.length > 1 ? p.replace(/\/+$/, '') : p);
+
+function runReplyAction(action: AgentAction): string | null {
   if (action.target === 'explorer') {
     const explorerActions = useExplorerContract.getState().actions;
-    return explorerActions ? explorerActions[action.type]() : false;
+    if (!explorerActions) return 'Explorer is not available.';
+    if (action.type === 'revealItems') {
+      explorerActions.revealItems(action.wsId, action.nodeIds);
+      return null;
+    }
+    explorerActions[action.type]();
+    return null;
   }
+
   const wsActions = useWorkspaceContract.getState().actions;
-  if (!wsActions) return false;
-  if (action.type === 'showDetails') return wsActions.showDetails();
-  return wsActions[action.type](action.itemId);
+  if (!wsActions) return 'Workspace actions are not available.';
+  if (action.type === 'showDetails') {
+    wsActions.showDetails();
+    return null;
+  }
+  const ok = wsActions[action.type](action.itemId);
+  if (!ok && action.type === 'closeItem') return 'That tab is already closed.';
+  if (!ok) return 'Could not open that item.';
+  return null;
 }
 
-async function askAndApply(text: string, asked: WorkspaceSnapshot | null): Promise<string> {
+async function askAndApply(
+  text: string,
+  asked: WorkspaceSnapshot | null,
+  itemTypes: ReadonlyMap<string, ItemType>,
+  router: AnyRouter,
+): Promise<string> {
   let reply;
   try {
-    reply = await agentApi.ask(text, asked);
+    reply = await agentApi.ask(text, asked, 600, itemTypes);
   } catch (err) {
     return err instanceof Error ? `Error: ${err.message}` : 'Could not reach the agent.';
   }
 
   let answer = reply.text;
   if (reply.actions.length > 0) {
+    const targetWsId = asked?.workspace?.id;
     const nowWsId = useWorkspaceContract.getState().current?.workspace?.id;
-    if (!asked?.workspace || nowWsId !== asked.workspace.id) {
-      answer += ' Skipped: you left that workspace.';
-    } else {
-      for (const action of reply.actions) {
-        if (!runReplyAction(action)) answer += ' (Skipped: you left that workspace or nothing changed.)';
-      }
+    const stillOnRoute = !!targetWsId && trimSlash(router.state.location.pathname) === `/workspaces/${targetWsId}`;
+    if (!targetWsId || nowWsId !== targetWsId || !stillOnRoute) {
+      return `${answer} Skipped: you left that workspace.`;
+    }
+    for (const action of reply.actions) {
+      const note = runReplyAction(action);
+      if (note) answer += ` (${note})`;
     }
   }
   return answer;
 }
 
 export default function AgentPanel() {
+  const registry = useRegistry();
+  const router = useRouter();
   const wsId = useWorkspaceContract((s) => s.current?.workspace?.id);
   const wsName = useWorkspaceContract((s) => s.current?.workspace?.name);
   const activeName = useWorkspaceContract((s) => s.current?.activeItem?.name);
@@ -93,7 +118,7 @@ export default function AgentPanel() {
 
     startSending(async () => {
       addOptimistic({ ws: targetWs, msg: { ...mine, pending: true } });
-      const answer = await askAndApply(text, asked);
+      const answer = await askAndApply(text, asked, registry.itemType, router);
       startTransition(() => {
         setHistory((prev) => ({
           ...prev,

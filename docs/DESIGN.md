@@ -264,6 +264,103 @@ stateDiagram-v2
     }
 ```
 
+### 5.4 Public State & Plugin Contract Guide (How to Read & Share State)
+
+Plugins never import another plugin's internal files (`stores/`, `components/`, `hooks/`). Instead, every plugin accesses shared state through **two public layers** enforced by ESLint:
+
+| Public API | Import Path | Available When | What It Provides |
+| --- | --- | --- | --- |
+| **`useShellLocation()`** | `@/lib/plugin-system` | Always | `{ path, container, panels }` — current URL path, active container ID (e.g. `'workspace.detail'`), and open optional `?panels=` |
+| **`useRegistry()`** | `@/lib/plugin-system` | Always | Boot-time plugin contributions: `plugins`, `activity`, `panel`, `itemType`, `panelsFor(container)`, `activeRouteActivity(path)` |
+| **`useWorkspaceContract`** | `@/features/workspace/contract` | On `/workspaces/new` & `/workspaces/$wsId` (`null` elsewhere) | `current`: `{ workspace, isDraft, activeKey, activeItem, openItems }`<br>`actions`: `{ showDetails(), openItem(itemId), closeItem(itemId) }` |
+| **`useExplorerContract`** | `@/features/explorer/contract` | While `ExplorerPanel` is mounted (`null` if unloaded/unmounted) | `current`: `{ workspaceId, collapsedIds }`<br>`actions`: `{ revealItems(wsId, nodeIds), collapseAll(), expandAll() }` |
+| **`resetAllPersisted()`** | `@/stores/persist` | Always | Resets all registered persisted stores (`ide:*`) and shell `lastHref` in memory |
+
+#### 1. Reading Shell State (`@/lib/plugin-system`)
+
+Use `enabledWhen` in `plugin.ts` or `useShellLocation()` / `useRegistry()` inside components to react to where the user is without coupling to route files:
+
+```tsx
+// In plugin.ts — declarative enable/disable based on the active route's staticData.container:
+enabledWhen: (loc) => loc.container === 'workspace.detail',
+
+// Inside any plugin component:
+const { path, container, panels } = useShellLocation();
+const registry = useRegistry();
+const itemMeta = registry.itemType.get('file');
+```
+
+#### 2. Consuming Another Plugin's State & Actions (`@/features/<name>/contract`)
+
+Follow **three rules** to prevent unnecessary re-renders and handle optional plugins safely:
+
+1. **In React render, select narrow primitives** (never subscribe to the whole `s.current` object if you only render a string or boolean—otherwise unrelated updates like opening a background tab will re-render your component):
+   ```tsx
+   import { EMPTY } from '@/lib/plugin-system';
+   import { useWorkspaceContract } from '@/features/workspace/contract';
+   import { useExplorerContract } from '@/features/explorer/contract';
+
+   const wsName = useWorkspaceContract((s) => s.current?.workspace?.name);
+   const activeName = useWorkspaceContract((s) => s.current?.activeItem?.name);
+   const collapsedIds = useExplorerContract((s) => s.current?.collapsedIds ?? EMPTY);
+   ```
+2. **In click handlers and `async` code, use `.getState()`** (creates zero render subscriptions, and lets you re-check state after `await`):
+   ```tsx
+   // Event handler — no component re-render subscription needed:
+   const onCrumbClick = () => {
+     useExplorerContract.getState().actions?.revealItems(wsId, ['primary-storefront']);
+   };
+
+   // Async handler — snapshot before await, verify still in workspace after await:
+   const asked = useWorkspaceContract.getState().current;
+   const reply = await myAsyncTask(asked);
+   if (useWorkspaceContract.getState().current?.workspace?.id === asked?.workspace?.id) {
+     useWorkspaceContract.getState().actions?.openItem('utils');
+   }
+   ```
+3. **Always treat `current` and `actions` as nullable (`?.`):** When the user navigates to `/settings` (or if a plugin is removed from `src/app/plugins.ts`), `current` and `actions` are `null`.
+
+#### 3. Publishing Shareable State from Your Own Plugin
+
+Only add stores that your plugin actually needs:
+- **0 stores** (`reports`, `settings`): No `localStorage` persistence and nothing shared with other plugins.
+- **1 store** (`contract.ts` only): Shares live state/actions with other plugins, no `localStorage` persistence needed.
+- **2 stores** (`workspace`, `explorer`): Private `localStorage` store in `stores/` (persisting raw IDs/layout) **plus** public `contract.ts` (exposing live domain state + orchestrated actions).
+
+To expose public state from `src/features/my-plugin/`:
+
+```ts
+// 1. src/features/my-plugin/contract.ts (pure: imports ONLY from @/lib/plugin-system)
+import { createPluginBridge } from '@/lib/plugin-system';
+
+export interface MySnapshot {
+  readonly activeFilter: string;
+}
+export interface MyActions {
+  setFilter(filter: string): void;
+}
+
+export const useMyPluginContract = createPluginBridge<MySnapshot, MyActions>();
+```
+
+```tsx
+// 2. Inside your mounted plugin component/hook — publish synchronously via useLayoutEffect:
+const setSnapshot = useMyPluginContract((s) => s.setSnapshot);
+const setActions = useMyPluginContract((s) => s.setActions);
+const clear = useMyPluginContract((s) => s.clear);
+
+useLayoutEffect(() => {
+  setSnapshot({ activeFilter });
+}, [activeFilter, setSnapshot]);
+
+useLayoutEffect(() => {
+  setActions({ setFilter });
+  return () => {
+    clear();
+  };
+}, [setFilter, setActions, clear]);
+```
+
 ---
 
 ## 6. Core Data Flows
