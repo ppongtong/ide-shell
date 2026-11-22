@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // "What's open" in workspaces — state that does NOT belong in the URL.
-// Persisted, so tabs come back after a refresh.
+// Persisted, so tabs and sidebar split ratios come back after a refresh.
+// Explorer folder/group expansion lives in features/explorer.
 // ─────────────────────────────────────────────────────────────
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -11,26 +12,22 @@ interface WorkbenchData {
   readonly tabs: Readonly<Record<string, readonly string[]>>;
   /** Last active tab per workspace, so switching workspaces lands on it. */
   readonly lastActive: Readonly<Record<string, string>>;
-  /** Collapsed folder/group ids per workspace (everything starts expanded by default). */
-  readonly collapsed: Readonly<Record<string, readonly string[]>>;
   /** Relative heights of stacked sidebar panels: { explorer: 1, agent: 1 } */
   readonly panelSizes: Readonly<Record<string, number>>;
 }
 
 interface WorkbenchState extends WorkbenchData {
+  /** Ensures `key` is in `tabs[ws]` and marks it as `lastActive[ws]` in one atomic write. */
   openTab(ws: string, key: string): void;
-  /** Removes the tab; returns the neighbour that should become active (or null). */
+  /** Removes the tab; updates `lastActive[ws]` if it was active, and returns the fallback neighbour (or null). */
   closeTab(ws: string, key: string): string | null;
   setLastActive(ws: string, key: string | undefined): void;
-  toggleFolder(ws: string, id: string): void;
-  expandAll(ws: string, ids: string[]): void;
   setPanelSizes(sizes: Record<string, number>): void;
 }
 
 const initialData: WorkbenchData = {
   tabs: {},
   lastActive: {},
-  collapsed: {},
   panelSizes: {},
 };
 
@@ -42,15 +39,33 @@ export const useWorkbench = create<WorkbenchState>()(
       openTab: (ws, key) =>
         set((s) => {
           const list = s.tabs[ws] ?? [];
-          return list.includes(key) ? s : { tabs: { ...s.tabs, [ws]: [...list, key] } };
+          const hasTab = list.includes(key);
+          const sameActive = s.lastActive[ws] === key;
+          if (hasTab && sameActive) return s;
+          return {
+            tabs: hasTab ? s.tabs : { ...s.tabs, [ws]: [...list, key] },
+            lastActive: sameActive ? s.lastActive : { ...s.lastActive, [ws]: key },
+          };
         }),
 
       closeTab: (ws, key) => {
-        const list = get().tabs[ws] ?? [];
+        const cur = get();
+        const list = cur.tabs[ws] ?? [];
         const i = list.indexOf(key);
         const rest = list.filter((k) => k !== key);
-        set((s) => ({ tabs: { ...s.tabs, [ws]: rest } }));
-        return rest[i] ?? rest[i - 1] ?? null; // right neighbour, else left, else Details tab
+        const fallback = rest[i] ?? rest[i - 1] ?? null; // right neighbour, else left, else Details tab
+        set((s) => {
+          const nextActive = { ...s.lastActive };
+          if (s.lastActive[ws] === key) {
+            if (fallback) nextActive[ws] = fallback;
+            else delete nextActive[ws];
+          }
+          return {
+            tabs: { ...s.tabs, [ws]: rest },
+            lastActive: nextActive,
+          };
+        });
+        return fallback;
       },
 
       setLastActive: (ws, key) =>
@@ -62,27 +77,11 @@ export const useWorkbench = create<WorkbenchState>()(
           return { lastActive: next };
         }),
 
-      toggleFolder: (ws, id) =>
-        set((s) => {
-          const list = s.collapsed[ws] ?? [];
-          const next = list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
-          return { collapsed: { ...s.collapsed, [ws]: next } };
-        }),
-
-      expandAll: (ws, ids) =>
-        set((s) => {
-          const list = s.collapsed[ws];
-          if (!list?.length) return s;
-          const toExpand = new Set(ids);
-          const next = list.filter((id) => !toExpand.has(id));
-          return next.length === list.length ? s : { collapsed: { ...s.collapsed, [ws]: next } };
-        }),
-
       setPanelSizes: (sizes) => set((s) => ({ panelSizes: { ...s.panelSizes, ...sizes } })),
     }),
     {
       name: persistName('workspace'),
-      version: 2,
+      version: 3,
       storage: persistStorage,
       migrate: () => initialData,
     },

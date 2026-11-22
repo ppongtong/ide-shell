@@ -1,6 +1,6 @@
 // Draft workspace creation screen (/workspaces/new).
-// Uses the same workbench layout as WorkspaceDetailPage so the pinned Details
-// tab flows directly into the saved workspace once required fields are created.
+// Publishes draft state to `@/features/workspace/contract` so Explorer renders its setup prompt.
+import { useSyncWorkspaceContract } from '../hooks/useSyncWorkspaceContract';
 import { SidebarPanels } from '../components/SidebarPanels';
 import { TabBar } from '../components/TabBar';
 import { EditorHost } from '../components/EditorHost';
@@ -8,10 +8,12 @@ import { EditorHost } from '../components/EditorHost';
 const NO_PANELS: readonly string[] = Object.freeze([]);
 
 export function NewWorkspacePage() {
+  useSyncWorkspaceContract(null);
+
   return (
     <div className="ws-detail">
       <title>New workspace · IDE</title>
-      <SidebarPanels workspace={null} panels={NO_PANELS} />
+      <SidebarPanels container="workspace.detail" panels={NO_PANELS} allowOptional={false} />
       <div className="editor-col">
         <TabBar workspace={null} />
         <EditorHost workspace={null} />

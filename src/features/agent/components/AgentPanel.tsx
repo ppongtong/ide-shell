@@ -1,11 +1,10 @@
 // ─────────────────────────────────────────────────────────────
-// Agent chat. React 19.x features:
-//   • useTransition + useOptimistic: your message shows instantly while
-//     clearing the input immediately so follow-up typing isn't wiped
-//   • <ViewTransition> (19.3): each new message animates in
-//   • Per-workspace message history so switching workspaces isolates chats
-// The workspace (what's open + actions to change it) comes from the
-// bridge store, so send() reads where the user is both before and after await.
+// Agent chat (`core.agent`).
+//   • Selects narrow primitive slices (`wsId`, `wsName`, `activeName`) from
+//     `@/features/workspace/contract`, so opening/closing background tabs
+//     never triggers a re-render.
+//   • Executes reply actions through `@/features/workspace/contract` and
+//     `@/features/explorer/contract` using `.getState()` before & after `await`.
 // ─────────────────────────────────────────────────────────────
 import {
   startTransition,
@@ -18,9 +17,9 @@ import {
   type FormEvent,
 } from 'react';
 import { Send } from 'lucide-react';
-import { useWorkspaceBridge } from '@/stores/workspace-bridge';
-import { agentApi } from '../api/agent';
-import { BridgeDemo } from './BridgeDemo';
+import { useWorkspaceContract, type WorkspaceSnapshot } from '@/features/workspace/contract';
+import { useExplorerContract } from '@/features/explorer/contract';
+import { agentApi, type AgentAction } from '../api/agent';
 
 interface Msg {
   id: string;
@@ -31,10 +30,44 @@ interface Msg {
 
 const EMPTY_MSGS: readonly Msg[] = Object.freeze([]);
 
+function runReplyAction(action: AgentAction): boolean {
+  if (action.target === 'explorer') {
+    const explorerActions = useExplorerContract.getState().actions;
+    return explorerActions ? explorerActions[action.type]() : false;
+  }
+  const wsActions = useWorkspaceContract.getState().actions;
+  if (!wsActions) return false;
+  if (action.type === 'showDetails') return wsActions.showDetails();
+  return wsActions[action.type](action.itemId);
+}
+
+async function askAndApply(text: string, asked: WorkspaceSnapshot | null): Promise<string> {
+  let reply;
+  try {
+    reply = await agentApi.ask(text, asked);
+  } catch (err) {
+    return err instanceof Error ? `Error: ${err.message}` : 'Could not reach the agent.';
+  }
+
+  let answer = reply.text;
+  if (reply.actions.length > 0) {
+    const nowWsId = useWorkspaceContract.getState().current?.workspace?.id;
+    if (!asked?.workspace || nowWsId !== asked.workspace.id) {
+      answer += ' Skipped: you left that workspace.';
+    } else {
+      for (const action of reply.actions) {
+        if (!runReplyAction(action)) answer += ` (${action.type} did nothing.)`;
+      }
+    }
+  }
+  return answer;
+}
+
 export default function AgentPanel() {
-  const current = useWorkspaceBridge((s) => s.current);
-  const wsKey = current?.workspace.id ?? '_none';
-  const activeName = current?.activeItem?.name;
+  const wsId = useWorkspaceContract((s) => s.current?.workspace?.id);
+  const wsName = useWorkspaceContract((s) => s.current?.workspace?.name);
+  const activeName = useWorkspaceContract((s) => s.current?.activeItem?.name);
+  const wsKey = wsId ?? '_none';
 
   const [history, setHistory] = useState<Record<string, Msg[]>>({});
   const messages = history[wsKey] ?? EMPTY_MSGS;
@@ -49,30 +82,13 @@ export default function AgentPanel() {
     if (!text || isPending) return;
     if (input) input.value = '';
 
-    const asked = useWorkspaceBridge.getState().current;
-    const targetWs = asked?.workspace.id ?? '_none';
+    const asked = useWorkspaceContract.getState().current;
+    const targetWs = asked?.workspace?.id ?? '_none';
     const mine: Msg = { id: crypto.randomUUID(), from: 'you', text };
 
     startSending(async () => {
       addOptimistic({ ...mine, pending: true });
-      let answer: string;
-      try {
-        const reply = await agentApi.ask(text, asked);
-        const { current: now, actions } = useWorkspaceBridge.getState();
-        answer = reply.text;
-        if (reply.actions.length) {
-          if (!actions || now?.workspace.id !== asked?.workspace.id) {
-            answer += ' Skipped: you left that workspace.';
-          } else {
-            for (const a of reply.actions) {
-              if (!actions[a.type](a.itemId)) answer += ` (${a.type} did nothing.)`;
-            }
-          }
-        }
-      } catch (err) {
-        answer = err instanceof Error ? `Error: ${err.message}` : 'Could not reach the agent.';
-      }
-
+      const answer = await askAndApply(text, asked);
       startTransition(() => {
         setHistory((prev) => ({
           ...prev,
@@ -89,19 +105,20 @@ export default function AgentPanel() {
   return (
     <div className="agent-panel">
       <div className="agent-ctx">
-        {current ? (
+        {wsName ? (
           <>
-            Context: <strong>{current.workspace.name}</strong>
+            Context: <strong>{wsName}</strong>
             {activeName && <> › <strong>{activeName}</strong></>}
           </>
         ) : (
           'No workspace open'
         )}
       </div>
-      <BridgeDemo />
       <div className="agent-msgs" aria-live="polite">
         {shown.length === 0 && (
-          <p className="hint">{`Ask about ${activeName ?? 'this workspace'}, or try “open <name>” / “close <name>”.`}</p>
+          <p className="hint">
+            {`Ask about ${activeName ?? 'this workspace'}, or try “open <name>”, “close <name>”, or “collapse all”.`}
+          </p>
         )}
         {shown.map((m) => (
           <ViewTransition key={m.id} enter="msg-enter" default="none">

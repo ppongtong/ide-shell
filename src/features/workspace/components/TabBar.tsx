@@ -1,15 +1,16 @@
 import { useRef, type KeyboardEvent } from 'react';
 import { SlidersHorizontal, X } from 'lucide-react';
 import { parseItem, useRegistry, type WorkspaceInfo } from '@/lib/plugin-system';
-import { useTabs } from '../hooks/useTabs';
+import { useTabActions } from '../hooks/useTabs';
+import { NONE, useWorkbench } from '../stores/workbench';
 
 export function TabBar({ workspace, activeKey }: { workspace: WorkspaceInfo | null; activeKey?: string }) {
   const registry = useRegistry();
   const wsId = workspace?.id ?? '__new__';
-  const tabs = useTabs(wsId, activeKey);
+  const openKeys = useWorkbench((s) => (workspace ? (s.tabs[workspace.id] ?? NONE) : NONE));
+  const actions = useTabActions(workspace);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const openKeys = workspace ? tabs.open : [];
   const totalTabs = 1 + openKeys.length; // index 0 = pinned Details tab
 
   function onTabKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -21,10 +22,10 @@ export function TabBar({ workspace, activeKey }: { workspace: WorkspaceInfo | nu
     if (next === -1) return;
     e.preventDefault();
     if (next === 0) {
-      if (workspace) tabs.showDetails();
+      actions?.showDetails();
     } else {
       const nextKey = openKeys[next - 1];
-      if (nextKey) tabs.activate(nextKey);
+      if (nextKey) actions?.activateKey(nextKey);
     }
     listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
   }
@@ -44,7 +45,7 @@ export function TabBar({ workspace, activeKey }: { workspace: WorkspaceInfo | nu
           aria-selected={detailsActive}
           aria-controls={`panel-${wsId}-__details__`}
           onClick={() => {
-            if (workspace) tabs.showDetails();
+            actions?.showDetails();
           }}
           onKeyDown={(e) => onTabKeyDown(e, 0)}
         >
@@ -72,13 +73,18 @@ export function TabBar({ workspace, activeKey }: { workspace: WorkspaceInfo | nu
                 tabIndex={active ? 0 : -1}
                 aria-selected={active}
                 aria-controls={`panel-${workspace.id}-${key}`}
-                onClick={() => tabs.activate(key)}
+                onClick={() => actions?.activateKey(key)}
                 onKeyDown={(e) => onTabKeyDown(e, i + 1)}
               >
                 {Icon && <Icon size={14} />}
                 {name}
               </button>
-              <button type="button" className="icon-btn" aria-label={`Close ${name}`} onClick={() => tabs.close(key)}>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={`Close ${name}`}
+                onClick={() => actions?.closeKey(key)}
+              >
                 <X size={13} />
               </button>
             </div>

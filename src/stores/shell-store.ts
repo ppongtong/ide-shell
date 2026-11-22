@@ -1,5 +1,6 @@
 // App-wide shell state only. Feature state lives in its feature's stores/.
 import { create } from 'zustand';
+import { registerResetter } from './persist';
 
 interface ShellState {
   /** Activity whose dialog is open. Not in the URL: Back should not reopen a dialog. */
@@ -20,3 +21,5 @@ export const useShell = create<ShellState>()((set) => ({
   rememberHref: (id, href) =>
     set((s) => (s.lastHref[id] === href ? s : { lastHref: { ...s.lastHref, [id]: href } })),
 }));
+
+registerResetter(() => useShell.setState({ lastHref: {} }));

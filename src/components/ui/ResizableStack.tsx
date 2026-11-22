@@ -1,9 +1,11 @@
 // ─────────────────────────────────────────────────────────────
 // Vertical stack of sections with draggable & keyboard-accessible
-// dividers. Hidden sections stay mounted via <Activity> so state
-// (e.g. agent chat) survives toggling panels off and on.
+// dividers.
+//   • Hidden sections stay mounted via <Activity> so state survives toggling.
+//   • Pointer drags update `flexGrow` + `aria-valuenow` directly via DOM refs
+//     (zero React renders during 60–120 Hz pointer movement; one commit on pointerup).
 // ─────────────────────────────────────────────────────────────
-import { Activity, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { Activity, useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 
 export interface StackSection {
   id: string;
@@ -38,12 +40,11 @@ const DIVIDER_HEIGHT = 5;
 
 export function ResizableStack({ sections, sizes, onResize, focusOnShow }: Props) {
   const box = useRef<HTMLDivElement>(null);
+  const panels = useRef(new Map<string, HTMLElement>());
   const bodies = useRef(new Map<string, HTMLDivElement>());
   const wasVisible = useRef<Set<string> | null>(null);
   const dragRef = useRef<DragState | null>(null);
-  const [dragSizes, setDragSizes] = useState<Record<string, number> | null>(null);
 
-  const activeSizes = dragSizes ?? sizes;
   const visible = sections.filter((s) => s.visible);
   const visibleKey = visible.map((s) => s.id).join('\0');
 
@@ -86,19 +87,34 @@ export function ResizableStack({ sections, sizes, onResize, focusOnShow }: Props
   function onPointerMove(e: PointerEvent<HTMLDivElement>) {
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return;
+    const total = d.startA + d.startB;
     const delta = (e.clientY - d.startY) / d.pxPerUnit;
-    const na = Math.max(MIN, Math.min(d.startA + d.startB - MIN, d.startA + delta));
-    const next = { [d.a]: na, [d.b]: d.startA + d.startB - na };
-    d.latest = next;
-    setDragSizes(next);
+    const na = Math.max(MIN, Math.min(total - MIN, d.startA + delta));
+    const nb = total - na;
+    d.latest = { [d.a]: na, [d.b]: nb };
+
+    const panelA = panels.current.get(d.a);
+    const panelB = panels.current.get(d.b);
+    if (panelA) panelA.style.flexGrow = String(na);
+    if (panelB) panelB.style.flexGrow = String(nb);
+    e.currentTarget.setAttribute('aria-valuenow', String(Math.round((na / total) * 100)));
   }
 
   function finishDrag(e: PointerEvent<HTMLDivElement>, commit: boolean) {
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return;
     dragRef.current = null;
-    setDragSizes(null);
-    if (commit && d.latest) onResize(d.latest);
+
+    if (commit && d.latest) {
+      onResize(d.latest);
+      return;
+    }
+    // Cancelled drag: restore committed sizes on DOM nodes.
+    const panelA = panels.current.get(d.a);
+    const panelB = panels.current.get(d.b);
+    if (panelA) panelA.style.flexGrow = String(d.startA);
+    if (panelB) panelB.style.flexGrow = String(d.startB);
+    e.currentTarget.setAttribute('aria-valuenow', String(Math.round((d.startA / (d.startA + d.startB)) * 100)));
   }
 
   function onSeparatorKeyDown(e: KeyboardEvent<HTMLDivElement>, a: string, b: string) {
@@ -117,8 +133,8 @@ export function ResizableStack({ sections, sizes, onResize, focusOnShow }: Props
       {sections.map((s) => {
         const i = visible.indexOf(s);
         const above = i > 0 ? visible[i - 1] : undefined;
-        const aboveSize = above ? (activeSizes[above.id] ?? 1) : 1;
-        const curSize = activeSizes[s.id] ?? 1;
+        const aboveSize = above ? (sizes[above.id] ?? 1) : 1;
+        const curSize = sizes[s.id] ?? 1;
         const ratioPercent = Math.round((aboveSize / (aboveSize + curSize)) * 100);
 
         return (
@@ -140,23 +156,59 @@ export function ResizableStack({ sections, sizes, onResize, focusOnShow }: Props
                 onKeyDown={(e) => onSeparatorKeyDown(e, above.id, s.id)}
               />
             )}
-            <section className="panel" style={{ flexGrow: curSize }}>
-              <header className="panel-head">{s.header}</header>
-              <div
-                className="panel-body"
-                ref={(el) => {
-                  if (el) bodies.current.set(s.id, el);
-                  return () => {
-                    bodies.current.delete(s.id);
-                  };
-                }}
-              >
-                {s.body}
-              </div>
-            </section>
+            <StackPanel
+              id={s.id}
+              size={curSize}
+              header={s.header}
+              body={s.body}
+              panelsRef={panels}
+              bodiesRef={bodies}
+            />
           </Activity>
         );
       })}
     </div>
+  );
+}
+
+function StackPanel({
+  id,
+  size,
+  header,
+  body,
+  panelsRef,
+  bodiesRef,
+}: {
+  id: string;
+  size: number;
+  header: ReactNode;
+  body: ReactNode;
+  panelsRef: { current: Map<string, HTMLElement> };
+  bodiesRef: { current: Map<string, HTMLDivElement> };
+}) {
+  return (
+    <section
+      className="panel"
+      style={{ flexGrow: size }}
+      ref={(el) => {
+        if (el) panelsRef.current.set(id, el);
+        return () => {
+          panelsRef.current.delete(id);
+        };
+      }}
+    >
+      <header className="panel-head">{header}</header>
+      <div
+        className="panel-body"
+        ref={(el) => {
+          if (el) bodiesRef.current.set(id, el);
+          return () => {
+            bodiesRef.current.delete(id);
+          };
+        }}
+      >
+        {body}
+      </div>
+    </section>
   );
 }

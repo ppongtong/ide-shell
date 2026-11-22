@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
-// core.agent — adds a panel INTO the workspace sidebar plus the
-// button that toggles it. It never touches the workspace feature.
+// core.agent — adds a panel INTO the workspace.detail sidebar
+// container plus the button that toggles it.
 // ─────────────────────────────────────────────────────────────
 import { lazy } from 'react';
 import { Sparkles } from 'lucide-react';
@@ -15,7 +15,7 @@ export const agentPlugin = definePlugin({
       title: 'Agent',
       icon: Sparkles,
       order: 20,
-      enabledWhen: (loc) => loc.view === 'workspace.detail',
+      enabledWhen: (loc) => loc.container === 'workspace.detail',
       disabledReason: 'open a workspace first',
       action: { kind: 'togglePanel', panelId: 'agent' },
     },

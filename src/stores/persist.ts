@@ -1,15 +1,30 @@
 // One prefix + reset registry for every persisted store, so Settings can reset
 // all workbench layout state in-memory without importing any feature's store
 // and without calling location.reload().
-import { createJSONStorage } from 'zustand/middleware';
+import { createJSONStorage, type StateStorage } from 'zustand/middleware';
 
 const PREFIX = 'ide:';
 const resetters = new Set<() => void>();
 
+const noopStorage: StateStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
+function getSafeStorage(): StateStorage {
+  try {
+    if (typeof localStorage !== 'undefined') return localStorage;
+  } catch {
+    /* blocked storage (private mode / sandboxed iframe) */
+  }
+  return noopStorage;
+}
+
 export const persistName = (name: string) => PREFIX + name;
 
-/** localStorage, or nothing if the browser blocks it (private mode, sandboxed frames). */
-export const persistStorage = createJSONStorage(() => localStorage);
+/** localStorage when available, or a silent no-op storage in Node tests / restricted frames. */
+export const persistStorage = createJSONStorage(getSafeStorage);
 
 /** Register an in-memory store reset callback when defining a persisted store. */
 export function registerResetter(reset: () => void) {
@@ -19,8 +34,10 @@ export function registerResetter(reset: () => void) {
 export function resetAllPersisted() {
   for (const reset of resetters) reset();
   try {
-    for (const key of Object.keys(localStorage)) {
-      if (key.startsWith(PREFIX)) localStorage.removeItem(key);
+    if (typeof localStorage !== 'undefined') {
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith(PREFIX)) localStorage.removeItem(key);
+      }
     }
   } catch {
     /* storage unavailable: nothing to clear */

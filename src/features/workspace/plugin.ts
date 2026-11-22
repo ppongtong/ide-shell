@@ -1,11 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // core.workspace — Workspaces button, New workspace button,
-// the Explorer panel and the built-in item types.
+// and the built-in workspace item types.
 // ─────────────────────────────────────────────────────────────
 import { lazy } from 'react';
 import { FileCode, Folder, FolderKanban, FolderPlus, KeyRound, Table } from 'lucide-react';
 import { definePlugin } from '@/lib/plugin-system';
-import ExplorerPanel from './components/ExplorerPanel';
 
 export const workspacePlugin = definePlugin({
   id: 'core.workspace',
@@ -28,21 +27,22 @@ export const workspacePlugin = definePlugin({
     },
   ],
 
-  panels: [
-    {
-      id: 'explorer',
-      title: 'Explorer',
-      container: 'workspace.detail',
-      order: 10,
-      alwaysOn: true,
-      component: ExplorerPanel,
-    },
-  ],
-
   itemTypes: [
     { type: 'primary', label: 'Primary', icon: KeyRound, isContainer: true },
     { type: 'folder', label: 'Folder', icon: Folder, isContainer: true },
-    { type: 'file', label: 'File', pluralLabel: 'Files', icon: FileCode, editor: lazy(() => import('./editors/FileEditor')) },
-    { type: 'dataset', label: 'Dataset', pluralLabel: 'Datasets', icon: Table, editor: lazy(() => import('./editors/DatasetEditor')) },
+    {
+      type: 'file',
+      label: 'File',
+      pluralLabel: 'Files',
+      icon: FileCode,
+      editor: lazy(() => import('./editors/FileEditor')),
+    },
+    {
+      type: 'dataset',
+      label: 'Dataset',
+      pluralLabel: 'Datasets',
+      icon: Table,
+      editor: lazy(() => import('./editors/DatasetEditor')),
+    },
   ],
 });

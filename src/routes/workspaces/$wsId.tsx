@@ -7,7 +7,10 @@ export const Route = createFileRoute('/workspaces/$wsId')({
   validateSearch: validateDetailSearch,
   search: { middlewares: [retainSearchParams(['panels'])] },
   loader: ({ params }) => workspacesApi.get(params.wsId),
-  staticData: { Breadcrumbs: WorkspaceBreadcrumbs },
+  staticData: {
+    container: 'workspace.detail',
+    Breadcrumbs: WorkspaceBreadcrumbs,
+  },
   component: WorkspaceDetailPage,
   errorComponent: ({ error }) => (
     <div className="empty">{error instanceof Error ? error.message : 'Could not open this workspace.'}</div>

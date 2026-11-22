@@ -96,7 +96,8 @@ a.crumb:hover, button.crumb:hover { color: var(--text); background: var(--hover)
 .tab.pinned { padding-right: 12px; }
 .tab.active { background: var(--bg); color: #fff; box-shadow: inset 0 1px 0 var(--accent); }
 .tab-label { display: flex; align-items: center; gap: 6px; height: 100%; }
-.editor { flex: 1; min-height: 0; display: flex; }
+.editor { flex: 1; min-height: 0; display: flex; outline: none; }
+.editor:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
 .code {
   flex: 1; resize: none; border: 0; outline: none; padding: 12px 16px; background: var(--bg); color: #d4d4d4;
   font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -125,21 +126,6 @@ a.crumb:hover, button.crumb:hover { color: var(--text); background: var(--hover)
   flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--border);
   border-radius: 4px; padding: 4px 8px; font: inherit;
 }
-/* Workspace bridge demo (features/agent/components/BridgeDemo.tsx) */
-.agent-demo { flex: none; padding: 6px 12px 8px; border-bottom: 1px solid var(--border); }
-.agent-demo summary {
-  cursor: pointer; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
-}
-.agent-demo dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 8px 0; }
-.agent-demo dt { color: var(--muted); }
-.agent-demo dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.agent-demo-row { display: flex; gap: 4px; }
-.agent-demo-row select {
-  flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: 4px; padding: 3px 6px; font: inherit;
-}
-.agent-demo-row .btn { padding: 3px 8px; }
-.agent-demo-result { margin: 6px 0 0; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .report-list li { margin: 6px 0; }
 
 /* ── Dialogs ─────────────────────────────────── */

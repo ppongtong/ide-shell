@@ -14,9 +14,8 @@ import { PRIMARY_TYPES, workspacesApi, type Workspace } from '../api/workspaces'
 interface FormResult {
   readonly error?: string;
   readonly saved?: boolean;
-  readonly name?: string;
-  readonly description?: string;
-  readonly primaryType?: string;
+  readonly draftName?: string;
+  readonly draftDescription?: string;
 }
 
 export function WorkspaceDetailsTab({ workspace }: { workspace: Workspace | null }) {
@@ -32,13 +31,25 @@ export function WorkspaceDetailsTab({ workspace }: { workspace: Workspace | null
   const activePreset = PRIMARY_TYPES.find((p) => p.id === (workspace?.primaryType ?? selectedPrimary));
 
   const [state, formAction] = useActionState<FormResult, FormData>(async (_prev, form) => {
-    const name = String(form.get('name') ?? '').trim();
-    const description = String(form.get('description') ?? '').trim();
+    const rawName = String(form.get('name') ?? '');
+    const rawDesc = String(form.get('description') ?? '');
+    const name = rawName.trim();
+    const description = rawDesc.trim();
     const primaryType = String(form.get('primaryType') ?? selectedPrimary).trim();
 
-    if (!name) return { error: 'Workspace name is required.', name, description, primaryType };
+    if (!name) {
+      return {
+        error: 'Workspace name is required.',
+        draftName: isDraft ? rawName : undefined,
+        draftDescription: rawDesc,
+      };
+    }
     if (isDraft && !primaryType) {
-      return { error: 'Choose a primary type to initialize the workspace.', name, description, primaryType };
+      return {
+        error: 'Choose a primary type to initialize the workspace.',
+        draftName: name,
+        draftDescription: description,
+      };
     }
 
     try {
@@ -55,19 +66,18 @@ export function WorkspaceDetailsTab({ workspace }: { workspace: Workspace | null
 
       await workspacesApi.update(workspace.id, { name, description });
       await router.invalidate();
-      return { saved: true, name, description };
+      return { saved: true };
     } catch (err) {
       return {
         error: err instanceof Error ? err.message : 'Could not save workspace details.',
-        name,
-        description,
-        primaryType,
+        draftName: name,
+        draftDescription: description,
       };
     }
   }, {});
 
-  const defaultName = state.name ?? workspace?.name ?? '';
-  const defaultDesc = state.description ?? workspace?.description ?? '';
+  const defaultName = state.draftName ?? workspace?.name ?? '';
+  const defaultDesc = state.draftDescription ?? workspace?.description ?? '';
 
   return (
     <div className="details-tab">
@@ -98,7 +108,7 @@ export function WorkspaceDetailsTab({ workspace }: { workspace: Workspace | null
             autoFocus={isDraft}
             defaultValue={defaultName}
             placeholder="e.g. Storefront v2"
-            aria-invalid={state.error && !defaultName ? true : undefined}
+            aria-invalid={state.error ? true : undefined}
             aria-describedby={state.error ? errId : undefined}
           />
         </div>

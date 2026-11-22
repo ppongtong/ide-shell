@@ -56,8 +56,8 @@ function ActivityItem({
   location: ShellLocation;
   activeRouteId: string | undefined;
 }) {
+  const registry = useRegistry();
   const navigate = useNavigate();
-  const last = useShell((s) => s.lastHref[a.id]);
   const showDialog = useShell((s) => s.showDialog);
 
   function onClick() {
@@ -67,19 +67,21 @@ function ActivityItem({
         showDialog(a.id);
         return;
 
-      case 'togglePanel':
-        if (!location.wsId) return;
+      case 'togglePanel': {
+        const panel = registry.panel.get(action.panelId);
+        if (!panel || location.container !== panel.container) return;
         void navigate({
-          to: '/workspaces/$wsId',
-          params: { wsId: location.wsId },
+          to: '.',
           search: (prev) => ({ ...prev, panels: togglePanel(prev.panels, action.panelId) }),
           replace: true, // panel on/off is not worth a Back step
         });
         return;
+      }
 
       case 'route':
         if (activeRouteId !== a.id) {
-          // From another area: back to where you were, or to the area's home.
+          // Read lastHref on click rather than subscribing during render.
+          const last = useShell.getState().lastHref[a.id];
           if (action.rememberLastLocation && last) void navigate({ href: last });
           else void navigate({ to: action.to });
         } else if (location.path !== action.to) {

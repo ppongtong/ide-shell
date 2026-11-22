@@ -1,6 +1,6 @@
 // The frame around every page: activity bar | breadcrumbs + page, plus the dialog host.
-import { useEffect, useEffectEvent } from 'react';
-import { Outlet, useRouterState } from '@tanstack/react-router';
+import { useEffect } from 'react';
+import { Outlet, useRouter } from '@tanstack/react-router';
 import { useRegistry } from '@/lib/plugin-system';
 import { useShell } from '@/stores/shell-store';
 import { ActivityBar } from './ActivityBar';
@@ -23,21 +23,24 @@ export function Shell() {
   );
 }
 
-/** For route activities with rememberLastLocation, store the last URL seen inside their area. */
+/**
+ * Subscribes directly to router `onResolved` events so recording `lastHref`
+ * never re-renders the root `<Shell>` component on URL/tab changes.
+ */
 function useRememberLastLocation() {
   const registry = useRegistry();
+  const router = useRouter();
   const rememberHref = useShell((s) => s.rememberHref);
-  const { pathname, href } = useRouterState({ select: (s) => s.location });
-
-  // React 19.2 useEffectEvent: reads the latest registry without making it an effect dependency.
-  const remember = useEffectEvent((path: string, url: string) => {
-    const active = registry.activeRouteActivity(path);
-    if (active?.action.kind === 'route' && active.action.rememberLastLocation) {
-      rememberHref(active.id, url);
-    }
-  });
 
   useEffect(() => {
-    remember(pathname, href);
-  }, [pathname, href]);
+    const record = () => {
+      const { pathname, href } = router.state.location;
+      const active = registry.activeRouteActivity(pathname);
+      if (active?.action.kind === 'route' && active.action.rememberLastLocation) {
+        rememberHref(active.id, href);
+      }
+    };
+    record();
+    return router.subscribe('onResolved', record);
+  }, [registry, router, rememberHref]);
 }

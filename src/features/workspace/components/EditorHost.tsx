@@ -27,6 +27,7 @@ export function EditorHost({ workspace, activeKey }: Props) {
           id={`panel-${wsKey}-__details__`}
           className="editor"
           role="tabpanel"
+          tabIndex={0}
           aria-labelledby={`tab-${wsKey}-__details__`}
         >
           <WorkspaceDetailsTab workspace={workspace} />
@@ -40,6 +41,7 @@ export function EditorHost({ workspace, activeKey }: Props) {
               id={`panel-${workspace.id}-${key}`}
               className="editor"
               role="tabpanel"
+              tabIndex={0}
               aria-labelledby={`tab-${workspace.id}-${key}`}
             >
               <EditorFor workspace={workspace} itemKey={key} />

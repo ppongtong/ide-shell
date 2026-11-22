@@ -1,24 +1,24 @@
 // ─────────────────────────────────────────────────────────────
 // The IDE plugin SDK contract. Every feature talks to the shell
-// and to other features through these types — built-in features included.
+// through these types — built-in features included.
 // ─────────────────────────────────────────────────────────────
 import type { ComponentType, LazyExoticComponent } from 'react';
 
 export type Icon = ComponentType<{ size?: number | string }>;
-export type Lazy<P> = LazyExoticComponent<ComponentType<P>> | ComponentType<P>;
+export type Lazy<P = Record<string, never>> = LazyExoticComponent<ComponentType<P>> | ComponentType<P>;
 
-/** "Where am I", derived from the URL only (see shell-location.ts). */
+/** "Where am I", derived from the active route's URL + staticData (zero feature route strings). */
 export interface ShellLocation {
   readonly path: string;
-  readonly view: 'workspace.list' | 'workspace.new' | 'workspace.detail' | 'settings' | 'plugin' | 'other';
-  readonly wsId?: string;
-  /** Extra sidebar panels switched on, e.g. ['agent']. Always-on panels are not listed. */
+  /** Container ID declared by the active route's staticData (e.g. 'workspace.detail'). */
+  readonly container?: string;
+  /** Optional view tag declared by the active route's staticData (e.g. 'workspace.new'). */
+  readonly view?: string;
+  /** Extra sidebar panels switched on via ?panels=, e.g. ['agent']. Always-on panels are not listed. */
   readonly panels: readonly string[];
-  /** Active tab, e.g. { type: 'file', id: 'utils' } */
-  readonly item?: { readonly type: string; readonly id: string };
 }
 
-// ── Workspace data shared with panels and editors ──────────
+// ── Core workspace item model & editor contribution point ──
 
 export interface Item {
   readonly id: string;
@@ -80,23 +80,19 @@ export interface Activity {
   readonly action: RouteAction | TogglePanelAction | DialogAction;
 }
 
-// ── Sidebar panels (stacked in the workspace sidebar) ──────
-
-/** Panels receive the host workspace (or null during draft creation on /workspaces/new). */
-export interface PanelProps {
-  readonly workspace: WorkspaceInfo | null;
-}
+// ── Sidebar panels (stacked in a container's sidebar) ──────
 
 export interface SidebarPanel {
   readonly id: string;
   readonly title: string;
-  /** Which screen hosts it. Only workspace details has a sidebar today. */
-  readonly container: 'workspace.detail';
+  /** Which container hosts it (matches route staticData.container, e.g. 'workspace.detail'). */
+  readonly container: string;
   /** Top-to-bottom order in the stack. */
   readonly order: number;
   /** Always shown (Explorer). Others appear when toggled on via ?panels= */
   readonly alwaysOn?: boolean;
-  readonly component: Lazy<PanelProps>;
+  /** Panels read shared state via feature contracts rather than shell-hardcoded props. */
+  readonly component: Lazy;
 }
 
 // ── Explorer item types ─────────────────────────────────────

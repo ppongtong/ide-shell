@@ -12,8 +12,8 @@ IDE Shell is a VS Code–style web app shell built with **React 19.3**, **TanSta
 
 - **What it provides:**
   - A fixed outer frame: left Activity Bar, top Breadcrumb bar, main page area, and a shared modal host.
-  - A boot-time plugin registry so features (`workspace`, `agent`, `reports`, `settings`) contribute buttons, sidebar panels, pages, and file editors without importing each other.
-  - A workspace workbench with a resizable sidebar (`Explorer` + `Agent`), a pinned non-closable **Details** tab, closable item tabs that keep unsaved edits alive while switching tabs, and an Agent panel that reads live workspace context and opens/closes tabs through a shared bridge store.
+  - A boot-time plugin registry so features (`workspace`, `explorer`, `agent`, `reports`, `settings`) contribute buttons, sidebar panels, pages, and file editors without importing each other's internals.
+  - A typed plugin contract pattern (`createPluginBridge` in `lib/plugin-system` + `src/features/<name>/contract.ts`): in-house `workspace` and `explorer` features demonstrate bidirectional cross-plugin state sharing consumed by `agent` and breadcrumbs, while all features read route-agnostic shell state (`useShellLocation`).
 - **What it intentionally leaves out (for now):**
   - Real backend persistence (`workspaces.ts` and `agent.ts` use in-memory mock data that resets on a full browser reload).
   - Runtime plugin installation/unloading (all plugins are registered once at startup in `src/app/plugins.ts`).
@@ -94,37 +94,39 @@ flowchart TD
 
 ## 3. Folder Layers & Dependency Rules
 
-To keep features independent, `eslint.config.js` enforces strict one-way imports with `no-restricted-imports`. If one feature tries to import another (for example, `agent` importing `workspace`), `npm run lint` fails immediately.
+To keep features independent while letting any plugin expose shareable state, `eslint.config.js` enforces strict one-way imports and co-located `contract.ts` boundaries with `no-restricted-imports` (blocking both `@/` aliases and relative `../` escapes).
 
 ```mermaid
 flowchart TD
     App["src/app/ (startup wiring)"] --> Shell["src/app/shell/ (outer frame)"]
     App --> Routes["src/routes/ (thin URL definitions)"]
-    App --> Features["src/features/* (workspace, agent, reports, settings)"]
+    App --> Features["src/features/* index.ts (workspace, explorer, agent, reports, settings)"]
 
     Routes --> Shell
     Routes --> Features
-    Routes --> Lib["src/lib/plugin-system/ (IDE plugin SDK)"]
+    Routes --> Lib["src/lib/plugin-system/ (IDE plugin SDK + createPluginBridge)"]
 
-    Shell --> Stores["src/stores/ (app-wide Zustand stores)"]
+    Shell --> Stores["src/stores/ (shell-store, persist)"]
     Shell --> Lib
     Shell --> UI["src/components/ui/ (app-agnostic UI)"]
 
+    Features --> Contracts["src/features/*/contract.ts (public cross-plugin state & actions)"]
     Features --> Stores
     Features --> Lib
     Features --> UI
 
+    Contracts --> Lib
     Stores --> Lib
 ```
 
 | Folder | Owns | May import | Blocked by ESLint |
 | --- | --- | --- | --- |
-| `src/app/` | Startup (`main.tsx`, `plugins.ts`, `app-registry.tsx`, `router.ts`) | Anything | None |
+| `src/app/` & `src/routes/` | Startup & thin route files | `@/features/<name>` (`index.ts`), `app/shell`, `lib`, `stores` | Deep `@/features/<name>/**` |
 | `src/app/shell/` | `Shell`, `ActivityBar`, `Breadcrumbs`, `DialogHost`, `PluginPageHost` | `lib`, `stores`, `components` | `features`, `routes` |
-| `src/routes/` | Thin TanStack route files (6–15 lines each) | A feature's `index.ts`, `app/shell`, `lib` | — |
-| `src/features/*` | Self-contained plugins (`workspace`, `agent`, `reports`, `settings`) | `lib`, `stores`, `components`, relative files inside its own folder | `app`, `routes`, **other features** (`@/features/**`) |
-| `src/stores/` | App-wide state (`shell-store.ts`, `workspace-bridge.ts`, `persist.ts`) | `lib` | `app`, `routes`, `features`, `components` |
-| `src/lib/` | Plugin SDK (`types.ts`, `registry.ts`, `search-params.ts`, `shell-location.ts`, `router-types.ts`) | External packages only | All app folders above it |
+| `src/features/<name>/**` | Self-contained plugins (`workspace`, `explorer`, `agent`, `reports`, `settings`) | `lib`, `stores`, `components`, `@/features/<other>/contract`, own relative files | `app`, `routes`, sibling feature barrels & internals (both `@/` and `../`) |
+| `src/features/*/contract.ts` | Shareable plugin state & actions (`createPluginBridge`) | `@/lib/plugin-system` | `app`, `routes`, `features`, `stores`, `components`, relative files |
+| `src/stores/` | Shell-wide state (`shell-store.ts`, `persist.ts`) | `lib` | `app`, `routes`, `features`, `components` |
+| `src/lib/` | Plugin SDK (`types.ts`, `bridge.ts`, `registry.ts`, `search-params.ts`, `shell-location.ts`, `router-types.ts`) | External packages only | All app folders above it |
 | `src/components/ui/` | App-agnostic UI (`Modal`, `ResizableStack`, `Breadcrumb`, `ActivityBarButton`) | External packages only | All app folders above it |
 
 ---

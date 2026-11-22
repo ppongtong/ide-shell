@@ -1,31 +1,32 @@
 // ─────────────────────────────────────────────────────────────
-// ShellLocation = "where am I", derived from the URL only via
-// TanStack Router's typed useMatch (zero `as` casts).
+// ShellLocation = "where am I", derived in a single structurally-shared
+// router subscription from pathname, ?panels=, and route staticData.
+// Zero hardcoded route paths, and tab switches (?item=) never trigger updates.
 // ─────────────────────────────────────────────────────────────
-import { useLocation, useMatch } from '@tanstack/react-router';
+import { useRouterState } from '@tanstack/react-router';
 import type { ShellLocation } from './types';
-import { parseItem, parsePanels } from './search-params';
+import { parsePanels } from './search-params';
+
+const NO_PANELS: readonly string[] = Object.freeze([]);
 
 export function useShellLocation(): ShellLocation {
-  const path = useLocation({ select: (l) => l.pathname });
-  const detail = useMatch({ from: '/workspaces/$wsId', shouldThrow: false });
-  const create = useMatch({ from: '/workspaces/new', shouldThrow: false });
-  const list = useMatch({ from: '/workspaces/', shouldThrow: false });
-  const settings = useMatch({ from: '/settings', shouldThrow: false });
-  const pluginPage = useMatch({ from: '/$activityId/$', shouldThrow: false });
-
-  if (detail) {
-    return {
-      path,
-      view: 'workspace.detail',
-      wsId: detail.params.wsId,
-      panels: parsePanels(detail.search.panels),
-      item: parseItem(detail.search.item),
-    };
-  }
-  if (create) return { path, view: 'workspace.new', panels: [] };
-  if (list) return { path, view: 'workspace.list', panels: [] };
-  if (settings) return { path, view: 'settings', panels: [] };
-  if (pluginPage) return { path, view: 'plugin', panels: [] };
-  return { path, view: 'other', panels: [] };
+  return useRouterState({
+    structuralSharing: true,
+    select: (state): ShellLocation => {
+      let container: string | undefined;
+      let view: string | undefined;
+      for (const m of state.matches) {
+        if (m.staticData?.container) container = m.staticData.container;
+        if (m.staticData?.view) view = m.staticData.view;
+      }
+      const rawPanels = (state.location.search as { panels?: unknown }).panels;
+      const panels = typeof rawPanels === 'string' && rawPanels ? parsePanels(rawPanels) : NO_PANELS;
+      return {
+        path: state.location.pathname,
+        container,
+        view,
+        panels,
+      };
+    },
+  });
 }

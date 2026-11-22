@@ -6,7 +6,7 @@ import { useEffect, useEffectEvent } from 'react';
 import { getRouteApi } from '@tanstack/react-router';
 import { parseItem, parsePanels, useRegistry } from '@/lib/plugin-system';
 import { useWorkbench } from '../stores/workbench';
-import { useSyncWorkspaceBridge } from '../hooks/useSyncWorkspaceBridge';
+import { useSyncWorkspaceContract } from '../hooks/useSyncWorkspaceContract';
 import { SidebarPanels } from '../components/SidebarPanels';
 import { TabBar } from '../components/TabBar';
 import { EditorHost } from '../components/EditorHost';
@@ -26,11 +26,10 @@ export function WorkspaceDetailPage() {
   const activeItem = isOpenable ? matchedItem : undefined;
 
   // URL → store: a shared link or refresh lands on an item that may not be open yet.
-  // Guarded so invalid/container ?item= params never pollute persisted tabs.
+  // `openTab` and `setLastActive` short-circuit when already synced (zero extra writes on UI tab clicks).
   const syncTabs = useEffectEvent((wsId: string, key: string | undefined, valid: boolean) => {
     if (key && valid) {
       openTab(wsId, key);
-      setLastActive(wsId, key);
     } else if (!key) {
       setLastActive(wsId, undefined);
     }
@@ -39,13 +38,13 @@ export function WorkspaceDetailPage() {
     syncTabs(workspace.id, item, isOpenable);
   }, [workspace.id, item, isOpenable]);
 
-  // Publishes live workspace state & actions to src/stores/workspace-bridge.ts.
-  useSyncWorkspaceBridge(workspace, activeItem);
+  // Publishes live workspace state & actions to `@/features/workspace/contract`.
+  useSyncWorkspaceContract(workspace, isOpenable ? item : undefined, activeItem);
 
   return (
     <div className="ws-detail">
       <title>{`${activeItem ? `${activeItem.name} · ` : ''}${workspace.name} · IDE`}</title>
-      <SidebarPanels workspace={workspace} panels={parsePanels(panels)} />
+      <SidebarPanels container="workspace.detail" panels={parsePanels(panels)} />
       <div className="editor-col">
         <TabBar workspace={workspace} activeKey={item} />
         <EditorHost workspace={workspace} activeKey={item} />

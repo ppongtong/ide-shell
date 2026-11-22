@@ -5,8 +5,7 @@ import { PluginPageHost } from '@/app/shell/PluginPageHost';
 
 export const Route = createFileRoute('/$activityId/$')({
   staticData: {
-    crumb: (m, registry) =>
-      registry.activity.get((m.params as { activityId: string }).activityId)?.title ?? 'Not found',
+    crumb: (params, registry) => registry.activity.get(params.activityId ?? '')?.title ?? 'Not found',
   },
   component: PluginPageHost,
 });
