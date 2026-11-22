@@ -2,6 +2,7 @@
 // each contribution carries its own `order`.
 import type { Plugin } from '@/lib/plugin-system';
 import { workspacePlugin } from '@/features/workspace';
+import { primaryPlugin } from '@/features/primary';
 import { explorerPlugin } from '@/features/explorer';
 import { agentPlugin } from '@/features/agent';
 import { notebookPlugin } from '@/features/notebook';
@@ -10,6 +11,7 @@ import { settingsPlugin } from '@/features/settings';
 
 export const plugins: readonly Plugin[] = [
   workspacePlugin,
+  primaryPlugin,
   explorerPlugin,
   agentPlugin,
   notebookPlugin,

@@ -1,5 +1,5 @@
 // Workspace detail URL search validation & cached item indexing.
-import { itemKey, parseItem, type Item, type ItemType, type WorkspaceInfo } from '@/lib/plugin-system';
+import { itemKey, parseItem, type Item, type ItemRenderer, type WorkspaceInfo } from '@/lib/plugin-system';
 
 export interface DetailSearch {
   readonly item?: string;
@@ -35,24 +35,28 @@ export function indexItems(workspace: WorkspaceInfo): ItemIndex {
   return built;
 }
 
-const openableCache = new WeakMap<ReadonlyMap<string, ItemType>, WeakMap<readonly Item[], ReadonlySet<string>>>();
+/** An item opens in a closable tab when it is not `'primary'` and its registered renderer provides a `component`. */
+export const isClosableTabType = (renderers: ReadonlyMap<string, ItemRenderer>, type: string): boolean =>
+  type !== 'primary' && !!renderers.get(type)?.component;
 
-/** Cached set of `"type:id"` keys in `workspace` that are openable in tabs (non-containers). */
+const openableCache = new WeakMap<ReadonlyMap<string, ItemRenderer>, WeakMap<readonly Item[], ReadonlySet<string>>>();
+
+/** Cached set of `"type:id"` keys in `workspace` that open in closable tabs. */
 export function openableKeys(
   workspace: WorkspaceInfo,
-  itemTypes: ReadonlyMap<string, ItemType>,
+  renderers: ReadonlyMap<string, ItemRenderer>,
 ): ReadonlySet<string> {
-  let byItems = openableCache.get(itemTypes);
+  let byItems = openableCache.get(renderers);
   if (!byItems) {
     byItems = new WeakMap();
-    openableCache.set(itemTypes, byItems);
+    openableCache.set(renderers, byItems);
   }
   const cached = byItems.get(workspace.items);
   if (cached) return cached;
 
   const set = new Set<string>();
   for (const item of workspace.items) {
-    if (!itemTypes.get(item.type)?.isContainer) {
+    if (isClosableTabType(renderers, item.type)) {
       set.add(itemKey(item.type, item.id));
     }
   }

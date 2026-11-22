@@ -1,15 +1,13 @@
 // ─────────────────────────────────────────────────────────────
 // Single source of truth for workspace tab mutations + URL sync.
 //   • Compares against `router.state.location.search.item` (not `lastActive`)
-//     so clicking after a stale/container URL always recovers cleanly,
-//     without re-navigating when already on that URL.
+//     so clicking after a stale/folder URL always recovers cleanly.
 //   • Aborts when `router.state.location.pathname` has already moved away
 //     from `/workspaces/${workspace.id}` (fixes pending-navigation race).
-//   • Zero dependency on Explorer: Explorer auto-reveals `activeItem` itself.
 // ─────────────────────────────────────────────────────────────
 import { useRouter, type AnyRouter } from '@tanstack/react-router';
 import { EMPTY, itemKey, useRegistry, type Registry, type WorkspaceInfo } from '@/lib/plugin-system';
-import { indexItems } from '../lib/search';
+import { indexItems, isClosableTabType } from '../lib/search';
 import { useWorkbench } from '../stores/workbench';
 
 const goToTab = (router: AnyRouter, wsId: string, key: string | undefined, replace: boolean) =>
@@ -27,7 +25,7 @@ const trimTrailingSlash = (path: string): string => (path.length > 1 ? path.repl
 
 export interface TabController {
   isActiveWorkspace(wsId: string): boolean;
-  showDetails(): boolean;
+  showPrimary(): boolean;
   activateKey(key: string): boolean;
   closeKey(key: string): boolean;
   openItemById(itemId: string): boolean;
@@ -47,7 +45,7 @@ export function createTabController(
 
   const isActiveWorkspace = (wsId: string): boolean => activeWorkspace()?.id === wsId;
 
-  const showDetails = (): boolean => {
+  const showPrimary = (): boolean => {
     const ws = activeWorkspace();
     if (!ws) return false;
     const state = useWorkbench.getState();
@@ -83,7 +81,8 @@ export function createTabController(
     if (!ws) return false;
     const item = indexItems(ws).byId.get(itemId);
     if (!item) return false;
-    if (registry.itemType.get(item.type)?.isContainer) return false;
+    if (item.type === 'primary') return showPrimary();
+    if (!isClosableTabType(registry.itemRenderer, item.type)) return false;
 
     const key = itemKey(item.type, item.id);
     const state = useWorkbench.getState();
@@ -102,10 +101,10 @@ export function createTabController(
     return closeKey(itemKey(item.type, item.id));
   };
 
-  return { isActiveWorkspace, showDetails, activateKey, closeKey, openItemById, closeItemById };
+  return { isActiveWorkspace, showPrimary, activateKey, closeKey, openItemById, closeItemById };
 }
 
-export function useTabActions(workspace: WorkspaceInfo | null): TabController {
+export function useTabActions(workspace: WorkspaceInfo): TabController {
   const registry = useRegistry();
   const router = useRouter();
   return createTabController(() => workspace, registry, router);

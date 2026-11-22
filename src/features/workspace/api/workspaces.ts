@@ -1,103 +1,23 @@
 // Mock backend. Swap the bodies for real fetch calls.
-import type { Item, WorkspaceInfo } from '@/lib/plugin-system';
+import { EMPTY, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
 
 export interface Workspace extends WorkspaceInfo {
   readonly description: string;
-  readonly primaryType: string;
 }
 export type WorkspaceSummary = Omit<Workspace, 'items'>;
 
-export interface PrimaryTypeOption {
+export interface SeedChildInput {
   readonly id: string;
-  readonly label: string;
-  readonly description: string;
-  readonly rootName: string;
-  readonly children: readonly {
-    readonly id: string;
-    readonly type: 'file' | 'dataset';
-    readonly name: string;
-    readonly content: string;
-  }[];
+  readonly type: string;
+  readonly name: string;
+  readonly content?: string;
 }
 
-export const PRIMARY_TYPES: readonly PrimaryTypeOption[] = [
-  {
-    id: 'storefront',
-    label: 'Storefront App',
-    description: 'Customer-facing web app with checkout flow and product catalog.',
-    rootName: 'Storefront Core',
-    children: [
-      {
-        id: 'checkout',
-        type: 'file',
-        name: 'checkout.ts',
-        content: 'export function calculateTotal(prices: number[]) {\n  return prices.reduce((a, b) => a + b, 0);\n}\n',
-      },
-      {
-        id: 'catalog',
-        type: 'dataset',
-        name: 'catalog.csv',
-        content: 'sku,name,price\nSKU-1,Keyboard,120\nSKU-2,Monitor,380\n',
-      },
-    ],
-  },
-  {
-    id: 'analytics',
-    label: 'Analytics Pipeline',
-    description: 'Data ingestion jobs and KPI metric definitions.',
-    rootName: 'Pipeline Root',
-    children: [
-      {
-        id: 'ingest',
-        type: 'file',
-        name: 'ingest.ts',
-        content: 'export async function ingestEvents(source: string) {\n  return `Synced ${source}`;\n}\n',
-      },
-      {
-        id: 'metrics',
-        type: 'dataset',
-        name: 'metrics.csv',
-        content: 'metric,target\nconversion,4.5%\nretention,82%\n',
-      },
-    ],
-  },
-  {
-    id: 'internal-tools',
-    label: 'Internal Tools',
-    description: 'Operations console and access-control rules.',
-    rootName: 'Ops Console',
-    children: [
-      {
-        id: 'admin',
-        type: 'file',
-        name: 'admin.ts',
-        content: 'export const roles = ["admin", "editor", "viewer"] as const;\n',
-      },
-      {
-        id: 'permissions',
-        type: 'dataset',
-        name: 'permissions.csv',
-        content: 'role,canDeploy\nadmin,true\neditor,false\n',
-      },
-    ],
-  },
-];
-
-function seedPrimaryItems(preset: PrimaryTypeOption): Item[] {
-  const rootId = `primary-${preset.id}`;
-  return [
-    { id: rootId, type: 'primary', name: preset.rootName, parentId: null },
-    ...preset.children.map((c) => ({
-      id: `${rootId}-${c.id}`,
-      type: c.type,
-      name: c.name,
-      parentId: rootId,
-      content: c.content,
-    })),
-  ];
+export interface SetPrimaryInput {
+  readonly name: string;
+  readonly content?: string;
+  readonly children?: readonly SeedChildInput[];
 }
-
-const RESERVED_IDS = new Set(['new']);
 
 export function createSlug(name: string, existingIds: Iterable<string>): string {
   const taken = new Set(existingIds);
@@ -108,7 +28,7 @@ export function createSlug(name: string, existingIds: Iterable<string>): string 
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') || 'workspace';
   let id = base;
-  for (let n = 2; RESERVED_IDS.has(id) || taken.has(id); n++) id = `${base}-${n}`;
+  for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
   return id;
 }
 
@@ -117,9 +37,32 @@ const db: Workspace[] = [
     id: 'acme',
     name: 'Acme',
     description: 'Storefront app and sales data',
-    primaryType: 'storefront',
     items: [
-      ...seedPrimaryItems(PRIMARY_TYPES[0]!),
+      {
+        id: 'primary-acme',
+        type: 'primary',
+        name: 'Storefront Core',
+        parentId: null,
+        content: JSON.stringify({
+          key: 'storefront-core',
+          source: 'commerce.orders_v2',
+          description: 'Customer-facing web storefront, checkout flow, and product catalog.',
+        }),
+      },
+      {
+        id: 'primary-acme-checkout',
+        type: 'file',
+        name: 'checkout.ts',
+        parentId: 'primary-acme',
+        content: 'export function calculateTotal(prices: number[]) {\n  return prices.reduce((a, b) => a + b, 0);\n}\n',
+      },
+      {
+        id: 'primary-acme-catalog',
+        type: 'dataset',
+        name: 'catalog.csv',
+        parentId: 'primary-acme',
+        content: 'sku,name,price\nSKU-1,Keyboard,120\nSKU-2,Monitor,380\n',
+      },
       {
         id: 'utils',
         type: 'file',
@@ -173,9 +116,32 @@ const db: Workspace[] = [
     id: 'globex',
     name: 'Globex',
     description: 'Internal tools',
-    primaryType: 'internal-tools',
     items: [
-      ...seedPrimaryItems(PRIMARY_TYPES[2]!),
+      {
+        id: 'primary-globex',
+        type: 'primary',
+        name: 'Ops Console',
+        parentId: null,
+        content: JSON.stringify({
+          key: 'ops-console',
+          source: 'iam.role_bindings',
+          description: 'Internal operations console and access-control rules.',
+        }),
+      },
+      {
+        id: 'primary-globex-admin',
+        type: 'file',
+        name: 'admin.ts',
+        parentId: 'primary-globex',
+        content: 'export const roles = ["admin", "editor", "viewer"] as const;\n',
+      },
+      {
+        id: 'primary-globex-permissions',
+        type: 'dataset',
+        name: 'permissions.csv',
+        parentId: 'primary-globex',
+        content: 'role,canDeploy\nadmin,true\neditor,false\n',
+      },
       {
         id: 'deploy',
         type: 'file',
@@ -198,7 +164,6 @@ const delay = <T,>(v: T, ms = 80) => new Promise<T>((r) => setTimeout(() => r(v)
 
 export interface CreateWorkspaceInput {
   readonly name: string;
-  readonly primaryType: string;
   readonly description?: string;
 }
 
@@ -211,10 +176,7 @@ export const workspacesApi = {
     return delay(ws);
   },
 
-  create: async ({ name, primaryType, description = '' }: CreateWorkspaceInput) => {
-    const preset = PRIMARY_TYPES.find((p) => p.id === primaryType);
-    if (!preset) throw new Error(`Unknown primary type "${primaryType}"`);
-
+  create: async ({ name, description = '' }: CreateWorkspaceInput) => {
     const id = createSlug(
       name,
       db.map((w) => w.id),
@@ -223,22 +185,36 @@ export const workspacesApi = {
       id,
       name: name.trim(),
       description: description.trim(),
-      primaryType: preset.id,
-      items: seedPrimaryItems(preset),
+      items: EMPTY,
     };
     db.push(ws); // in-memory only: gone after a refresh
-    return delay(ws, 180);
+    return delay(ws, 120);
   },
 
-  update: async (id: string, patch: { readonly name: string; readonly description: string }) => {
-    const index = db.findIndex((w) => w.id === id);
+  setPrimary: async (wsId: string, { name, content, children = EMPTY }: SetPrimaryInput) => {
+    const index = db.findIndex((w) => w.id === wsId);
     const existing = index >= 0 ? db[index] : undefined;
-    if (!existing) throw new Error(`Workspace "${id}" not found`);
-    const updated: Workspace = {
-      ...existing,
-      name: patch.name.trim(),
-      description: patch.description.trim(),
-    };
+    if (!existing) throw new Error(`Workspace "${wsId}" not found`);
+
+    const rootId = `primary-${wsId}`;
+    const prevPrimaryIds = new Set(
+      existing.items.filter((i) => i.type === 'primary' || i.parentId === rootId).map((i) => i.id),
+    );
+    const keptItems = existing.items.filter((i) => !prevPrimaryIds.has(i.id));
+
+    const seeded: Item[] = [
+      { id: rootId, type: 'primary', name: name.trim(), parentId: null, content },
+      ...children.map((c) => ({
+        id: `${rootId}-${c.id}`,
+        type: c.type,
+        name: c.name,
+        parentId: rootId,
+        content: c.content,
+      })),
+      ...keptItems,
+    ];
+
+    const updated: Workspace = { ...existing, items: seeded };
     db[index] = updated;
     return delay(updated, 120);
   },

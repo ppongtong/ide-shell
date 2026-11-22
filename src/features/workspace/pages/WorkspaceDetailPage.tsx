@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // Workspace details = split panel:
-//   [ stacked sidebar panels | tab bar + editors ]
+//   [ stacked sidebar panels | tab bar + item renderers ]
 // ─────────────────────────────────────────────────────────────
 import { useEffectEvent, useLayoutEffect } from 'react';
 import { getRouteApi } from '@tanstack/react-router';
@@ -24,9 +24,10 @@ export function WorkspaceDetailPage() {
   const pruneTabs = useWorkbench((s) => s.pruneTabs);
 
   const { byKey } = indexItems(workspace);
-  const validKeySet = openableKeys(workspace, registry.itemType);
+  const validKeySet = openableKeys(workspace, registry.itemRenderer);
   const isOpenable = !!item && validKeySet.has(item);
   const activeItem = isOpenable ? byKey.get(item) : undefined;
+  const primaryItem = workspace.items.find((i) => i.type === 'primary' && i.parentId === null);
 
   // Compute one canonical open-tab list so TabBar and EditorHost always match on deep links.
   const validStored = storedTabs.filter((k) => validKeySet.has(k));
@@ -49,7 +50,6 @@ export function WorkspaceDetailPage() {
     syncActiveTab(workspace.id, item, isOpenable);
   }, [workspace.id, item, isOpenable]);
 
-  // Pass raw `item` as `activeKey` so Explorer and TabBar stay consistent on unopenable `?item=` URLs.
   useSyncWorkspaceContract(workspace, item, activeItem);
 
   return (
@@ -57,8 +57,8 @@ export function WorkspaceDetailPage() {
       <title>{`${activeItem ? `${activeItem.name} · ` : ''}${workspace.name} · IDE`}</title>
       <SidebarPanels container="workspace.detail" panels={parsePanels(panels)} />
       <div className="editor-col">
-        <TabBar workspace={workspace} openKeys={openKeys} activeKey={item} />
-        <EditorHost workspace={workspace} openKeys={openKeys} activeKey={item} />
+        <TabBar workspace={workspace} primaryItem={primaryItem} openKeys={openKeys} activeKey={item} />
+        <EditorHost workspace={workspace} primaryItem={primaryItem} openKeys={openKeys} activeKey={item} />
       </div>
     </div>
   );

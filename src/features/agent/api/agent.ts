@@ -4,13 +4,13 @@
 // without importing either feature's internal implementation or route paths.
 // Understands: "open <item>", "close <item>", "collapse all", "expand all".
 // ─────────────────────────────────────────────────────────────
-import type { Item, ItemType, WorkspaceInfo } from '@/lib/plugin-system';
+import type { Item, ItemRenderer, WorkspaceInfo } from '@/lib/plugin-system';
 import { useWorkspaceContract, type WorkspaceSnapshot } from '@/features/workspace/contract';
 import { useExplorerContract } from '@/features/explorer/contract';
 
 export type AgentAction =
   | { readonly target: 'workspace'; readonly type: 'openItem' | 'closeItem'; readonly itemId: string }
-  | { readonly target: 'workspace'; readonly type: 'showDetails' }
+  | { readonly target: 'workspace'; readonly type: 'showPrimary' }
   | { readonly target: 'explorer'; readonly type: 'collapseAll' | 'expandAll' };
 
 export interface AgentReply {
@@ -40,10 +40,10 @@ function reply(question: string, ctx: WorkspaceSnapshot | null): AgentReply {
       actions: [{ target: 'explorer', type: 'expandAll' }],
     };
   }
-  if (normalized === 'show details' || normalized === 'open details') {
+  if (normalized === 'show primary' || normalized === 'show details' || normalized === 'open details') {
     return {
-      text: `(demo) Showing ${ws.name} details.`,
-      actions: [{ target: 'workspace', type: 'showDetails' }],
+      text: `(demo) Showing ${ws.name} primary view.`,
+      actions: [{ target: 'workspace', type: 'showPrimary' }],
     };
   }
 
@@ -79,14 +79,13 @@ function chainIdsTo(items: readonly Item[], id: string): string[] {
 
 /**
  * Executes one `AgentAction` against the workspace/explorer contracts.
- * Container `openItem` requests reveal the container in Explorer (and show Details if `pinnedRoot`),
- * using live `registry.itemType` metadata rather than hardcoded type names.
+ * `primary` and folder-only items reveal in Explorer (and switch to the pinned Primary tab for `primary`).
  * Returns `null` on success, or a human-readable explanation if nothing changed.
  */
 export function runAgentAction(
   action: AgentAction,
   workspace: WorkspaceInfo,
-  itemTypes: ReadonlyMap<string, ItemType>,
+  renderers: ReadonlyMap<string, ItemRenderer>,
 ): string | null {
   if (action.target === 'explorer') {
     const explorerActions = useExplorerContract.getState().actions;
@@ -97,16 +96,19 @@ export function runAgentAction(
 
   const wsActions = useWorkspaceContract.getState().actions;
   if (!wsActions) return 'Workspace actions are not available.';
-  if (action.type === 'showDetails') {
-    wsActions.showDetails();
+  if (action.type === 'showPrimary') {
+    wsActions.showPrimary();
     return null;
   }
 
   const item = workspace.items.find((i) => i.id === action.itemId);
-  const meta = item ? itemTypes.get(item.type) : undefined;
-  if (item && meta?.isContainer) {
-    if (action.type === 'closeItem') return `${item.name} is a container, not an openable tab.`;
-    if (meta.pinnedRoot) wsActions.showDetails();
+  const renderer = item ? renderers.get(item.type) : undefined;
+  const isPrimary = item?.type === 'primary';
+  const isFolderOnly = !!item && !!renderer && !renderer.component;
+
+  if (item && (isPrimary || isFolderOnly)) {
+    if (action.type === 'closeItem') return `${item.name} is not a closable tab.`;
+    if (isPrimary) wsActions.showPrimary();
     const explorerActions = useExplorerContract.getState().actions;
     if (!explorerActions) return 'Explorer is not available.';
     explorerActions.revealItems(workspace.id, chainIdsTo(workspace.items, item.id));

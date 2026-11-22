@@ -1,23 +1,27 @@
 import { useRef, type KeyboardEvent } from 'react';
-import { SlidersHorizontal, X } from 'lucide-react';
-import { parseItem, useRegistry, type WorkspaceInfo } from '@/lib/plugin-system';
+import { KeyRound, X } from 'lucide-react';
+import { parseItem, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
 import { indexItems } from '../lib/search';
 import { useTabActions } from '../hooks/useTabs';
 
 interface Props {
-  workspace: WorkspaceInfo | null;
+  workspace: WorkspaceInfo;
+  primaryItem: Item | undefined;
   openKeys: readonly string[];
   activeKey?: string;
 }
 
-export function TabBar({ workspace, openKeys, activeKey }: Props) {
+export function TabBar({ workspace, primaryItem, openKeys, activeKey }: Props) {
   const registry = useRegistry();
-  const wsId = workspace?.id ?? '__new__';
   const actions = useTabActions(workspace);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const byKey = workspace ? indexItems(workspace).byKey : undefined;
-  const totalTabs = 1 + openKeys.length; // index 0 = pinned Details tab
+  const primaryRenderer = registry.itemRenderer.get('primary');
+  const PrimaryIcon = primaryRenderer?.icon ?? KeyRound;
+  const primaryLabel = primaryItem?.name ?? primaryRenderer?.label ?? 'Primary';
+
+  const { byKey } = indexItems(workspace);
+  const totalTabs = 1 + openKeys.length; // index 0 = pinned Primary tab
 
   function onTabKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
     let next = -1;
@@ -28,7 +32,7 @@ export function TabBar({ workspace, openKeys, activeKey }: Props) {
     if (next === -1) return;
     e.preventDefault();
     if (next === 0) {
-      actions.showDetails();
+      actions.showPrimary();
     } else {
       const nextKey = openKeys[next - 1];
       if (nextKey) actions.activateKey(nextKey);
@@ -36,70 +40,69 @@ export function TabBar({ workspace, openKeys, activeKey }: Props) {
     listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
   }
 
-  const detailsActive = !activeKey;
+  const primaryActive = !activeKey;
 
   return (
     <div ref={listRef} className="tabbar" role="tablist" aria-label="Open items">
-      {/* Pinned, non-closable first tab */}
-      <div className={`tab pinned ${detailsActive ? 'active' : ''}`}>
+      {/* Pinned, non-closable first tab (renders the `type: 'primary'` plugin) */}
+      <div className={`tab pinned ${primaryActive ? 'active' : ''}`}>
         <button
           type="button"
-          id={`tab-${wsId}-__details__`}
+          id={`tab-${workspace.id}-__primary__`}
           className="tab-label"
           role="tab"
-          tabIndex={detailsActive ? 0 : -1}
-          aria-selected={detailsActive}
-          aria-controls={`panel-${wsId}-__details__`}
+          tabIndex={primaryActive ? 0 : -1}
+          aria-selected={primaryActive}
+          aria-controls={`panel-${workspace.id}-__primary__`}
           onClick={() => {
-            actions.showDetails();
+            actions.showPrimary();
           }}
           onKeyDown={(e) => onTabKeyDown(e, 0)}
         >
-          <SlidersHorizontal size={14} aria-hidden="true" />
-          Details
+          <PrimaryIcon size={14} aria-hidden="true" />
+          {primaryLabel}
         </button>
       </div>
 
-      {workspace &&
-        openKeys.map((key, i) => {
-          const ref = parseItem(key);
-          if (!ref) return null;
-          const item = byKey?.get(key);
-          const Icon = registry.itemType.get(ref.type)?.icon;
-          const active = key === activeKey;
-          const name = item?.name ?? key;
+      {openKeys.map((key, i) => {
+        const ref = parseItem(key);
+        if (!ref) return null;
+        const item = byKey.get(key);
+        const Icon = registry.itemRenderer.get(ref.type)?.icon;
+        const active = key === activeKey;
+        const name = item?.name ?? key;
 
-          return (
-            <div key={key} className={`tab ${active ? 'active' : ''}`}>
-              <button
-                type="button"
-                id={`tab-${workspace.id}-${key}`}
-                className="tab-label"
-                role="tab"
-                tabIndex={active ? 0 : -1}
-                aria-selected={active}
-                aria-controls={`panel-${workspace.id}-${key}`}
-                onClick={() => {
-                  actions.activateKey(key);
-                }}
-                onKeyDown={(e) => onTabKeyDown(e, i + 1)}
-              >
-                {Icon && <Icon size={14} />}
-                {name}
-              </button>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label={`Close ${name}`}
-                onClick={() => {
-                  actions.closeKey(key);
-                }}
-              >
-                <X size={13} />
-              </button>
-            </div>
-          );
-        })}
+        return (
+          <div key={key} className={`tab ${active ? 'active' : ''}`}>
+            <button
+              type="button"
+              id={`tab-${workspace.id}-${key}`}
+              className="tab-label"
+              role="tab"
+              tabIndex={active ? 0 : -1}
+              aria-selected={active}
+              aria-controls={`panel-${workspace.id}-${key}`}
+              onClick={() => {
+                actions.activateKey(key);
+              }}
+              onKeyDown={(e) => onTabKeyDown(e, i + 1)}
+            >
+              {Icon && <Icon size={14} />}
+              {name}
+            </button>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={`Close ${name}`}
+              onClick={() => {
+                actions.closeKey(key);
+              }}
+            >
+              <X size={13} />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

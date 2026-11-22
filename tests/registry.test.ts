@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRegistry, type Activity, type Plugin, type SidebarPanel } from '@/lib/plugin-system';
 import { workspacePlugin } from '../src/features/workspace/plugin.ts';
+import { primaryPlugin } from '../src/features/primary/plugin.ts';
 import { agentPlugin } from '../src/features/agent/plugin.ts';
 import { notebookPlugin } from '../src/features/notebook/plugin.ts';
 import { reportsPlugin } from '../src/features/reports/plugin.ts';
@@ -122,10 +123,10 @@ describe('createRegistry', () => {
     assert.throws(
       () =>
         createRegistry([
-          { id: 'p1', itemTypes: [{ type: 'file', label: 'File', icon: Icon }] },
-          { id: 'p2', itemTypes: [{ type: 'file', label: 'Duplicate', icon: Icon }] },
+          { id: 'p1', itemRenderers: [{ type: 'file', label: 'File', icon: Icon }] },
+          { id: 'p2', itemRenderers: [{ type: 'file', label: 'Duplicate', icon: Icon }] },
         ]),
-      /Duplicate item type "file"/,
+      /Duplicate item renderer "file"/,
     );
 
     assert.throws(
@@ -158,6 +159,7 @@ describe('createRegistry', () => {
     };
     const reg = createRegistry([
       workspacePlugin,
+      primaryPlugin,
       explorerStub,
       agentPlugin,
       notebookPlugin,
@@ -166,10 +168,14 @@ describe('createRegistry', () => {
     ]);
     const shortcuts = reg.activity.get('shortcuts');
     assert.equal(shortcuts?.action.kind, 'dialog');
+    assert.equal(reg.activity.get('new-workspace')?.action.kind, 'dialog');
 
-    const notebookType = reg.itemType.get('notebook');
-    assert.equal(notebookType?.pluralLabel, 'Notebooks');
-    assert.ok(notebookType?.editor, 'expected notebookPlugin to register a lazy editor renderer');
+    const primaryRenderer = reg.itemRenderer.get('primary');
+    assert.ok(primaryRenderer?.component, 'expected primaryPlugin to register the type: "primary" renderer');
+
+    const notebookRenderer = reg.itemRenderer.get('notebook');
+    assert.equal(notebookRenderer?.pluralLabel, 'Notebooks');
+    assert.ok(notebookRenderer?.component, 'expected notebookPlugin to register a lazy component renderer');
 
     useShell.getState().showDialog('shortcuts');
     assert.equal(useShell.getState().openDialog, 'shortcuts');

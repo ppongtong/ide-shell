@@ -8,11 +8,11 @@ import { agentApi, runAgentAction } from '../src/features/agent/api/agent.ts';
 const Icon = () => null;
 
 const testPlugin: Plugin = {
-  id: 'test.types',
-  itemTypes: [
-    { type: 'primary', label: 'Primary', icon: Icon, isContainer: true, pinnedRoot: true },
-    { type: 'folder', label: 'Folder', icon: Icon, isContainer: true },
-    { type: 'file', label: 'File', icon: Icon },
+  id: 'test.renderers',
+  itemRenderers: [
+    { type: 'primary', label: 'Primary Key', icon: Icon, component: Icon },
+    { type: 'folder', label: 'Folder', icon: Icon },
+    { type: 'file', label: 'File', icon: Icon, component: Icon },
   ],
 };
 
@@ -21,12 +21,11 @@ const snapshot: WorkspaceSnapshot = {
     id: 'acme',
     name: 'Acme',
     items: [
-      { id: 'primary-storefront', type: 'primary', name: 'Storefront Core', parentId: null },
+      { id: 'primary-acme', type: 'primary', name: 'Storefront Core', parentId: null },
       { id: 'src', type: 'folder', name: 'src', parentId: null },
       { id: 'utils', type: 'file', name: 'utils.ts', parentId: 'src', content: '' },
     ],
   },
-  isDraft: false,
   openItems: [],
 };
 
@@ -42,19 +41,20 @@ describe('agentApi & action runner', () => {
     assert.deepEqual(closeRes.actions, [{ target: 'workspace', type: 'closeItem', itemId: 'utils' }]);
   });
 
-  it('routes container openItem actions to Explorer revealItems (plus showDetails for pinnedRoot)', () => {
+  it('routes folder and primary openItem actions cleanly using ItemRenderer metadata', () => {
     const registry = createRegistry([testPlugin]);
     const revealed: Array<{ wsId: string; ids: readonly string[] }> = [];
-    let detailsShown = 0;
+    let primaryShown = 0;
 
     useWorkspaceContract.getState().setActions({
       isActiveWorkspace: (id) => id === 'acme',
-      showDetails: () => {
-        detailsShown += 1;
+      showPrimary: () => {
+        primaryShown += 1;
         return true;
       },
       openItem: () => false,
       closeItem: () => false,
+      setPrimaryItem: async () => true,
     });
     useExplorerContract.getState().setActions({
       revealItems: (wsId, ids) => {
@@ -67,21 +67,21 @@ describe('agentApi & action runner', () => {
     try {
       const folderNote = runAgentAction(
         { target: 'workspace', type: 'openItem', itemId: 'src' },
-        snapshot.workspace!,
-        registry.itemType,
+        snapshot.workspace,
+        registry.itemRenderer,
       );
       assert.equal(folderNote, null);
-      assert.equal(detailsShown, 0);
+      assert.equal(primaryShown, 0);
       assert.deepEqual(revealed, [{ wsId: 'acme', ids: ['src'] }]);
 
       const rootNote = runAgentAction(
-        { target: 'workspace', type: 'openItem', itemId: 'primary-storefront' },
-        snapshot.workspace!,
-        registry.itemType,
+        { target: 'workspace', type: 'openItem', itemId: 'primary-acme' },
+        snapshot.workspace,
+        registry.itemRenderer,
       );
       assert.equal(rootNote, null);
-      assert.equal(detailsShown, 1);
-      assert.deepEqual(revealed[1], { wsId: 'acme', ids: ['primary-storefront'] });
+      assert.equal(primaryShown, 1);
+      assert.deepEqual(revealed[1], { wsId: 'acme', ids: ['primary-acme'] });
     } finally {
       useWorkspaceContract.getState().clear();
       useExplorerContract.getState().clear();

@@ -1,30 +1,30 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Item, ItemType } from '../src/lib/plugin-system/types.ts';
+import type { Item, ItemRenderer } from '../src/lib/plugin-system/types.ts';
 import { buildExplorerTree } from '../src/features/explorer/lib/tree.ts';
 import { useExplorerStore } from '../src/features/explorer/stores/explorer-store.ts';
 import { resetAllPersisted } from '../src/stores/persist.ts';
 
 const Icon = () => null;
 
-const itemTypes = new Map<string, ItemType>([
-  ['root-bundle', { type: 'root-bundle', label: 'Bundle', icon: Icon, isContainer: true, pinnedRoot: true }],
-  ['folder', { type: 'folder', label: 'Folder', icon: Icon, isContainer: true }],
-  ['file', { type: 'file', label: 'File', pluralLabel: 'Files', icon: Icon }],
-  ['dataset', { type: 'dataset', label: 'Dataset', pluralLabel: 'Datasets', icon: Icon }],
+const renderers = new Map<string, ItemRenderer>([
+  ['primary', { type: 'primary', label: 'Primary Key', icon: Icon, component: Icon }],
+  ['folder', { type: 'folder', label: 'Folder', icon: Icon }],
+  ['file', { type: 'file', label: 'File', pluralLabel: 'Files', icon: Icon, component: Icon }],
+  ['dataset', { type: 'dataset', label: 'Dataset', pluralLabel: 'Datasets', icon: Icon, component: Icon }],
 ]);
 
 describe('explorer tree & store', () => {
-  it('pins pinnedRoot item types with nested children and groups remaining leaf items by type', () => {
+  it('pins primary roots with nested children and groups remaining openable items by renderer type', () => {
     const items: Item[] = [
-      { id: 'primary-1', type: 'root-bundle', name: 'Core', parentId: null },
+      { id: 'primary-1', type: 'primary', name: 'Storefront Core', parentId: null },
       { id: 'child-b', type: 'file', name: 'b.ts', parentId: 'primary-1' },
       { id: 'child-a', type: 'file', name: 'a.ts', parentId: 'primary-1' },
       { id: 'z-file', type: 'file', name: 'zeta.ts', parentId: null },
       { id: 'a-file', type: 'file', name: 'alpha.ts', parentId: null },
     ];
 
-    const tree = buildExplorerTree(items, itemTypes);
+    const tree = buildExplorerTree(items, renderers);
     assert.deepEqual(
       tree.primaryRoots.map((i) => i.id),
       ['primary-1'],
@@ -33,13 +33,12 @@ describe('explorer tree & store', () => {
       (tree.byParent.get('primary-1') ?? []).map((i) => i.name),
       ['a.ts', 'b.ts'],
     );
-    // Primary subtree items are not duplicated in the Files group below
     assert.deepEqual(
-      (tree.byItemType.get('file') ?? []).map((i) => i.name),
+      (tree.byRendererType.get('file') ?? []).map((i) => i.name),
       ['alpha.ts', 'zeta.ts'],
     );
     assert.deepEqual(
-      tree.leafTypes.map((t) => t.type),
+      tree.groupRenderers.map((r) => r.type),
       ['file', 'dataset'],
     );
     assert.deepEqual(tree.unknownItems, []);
@@ -50,7 +49,7 @@ describe('explorer tree & store', () => {
       { id: 'u1', type: 'file', name: 'utils.ts', parentId: null },
       { id: 'nb1', type: 'unregistered-nb', name: 'revenue.nb', parentId: null },
     ];
-    const tree = buildExplorerTree(items, itemTypes);
+    const tree = buildExplorerTree(items, renderers);
     assert.deepEqual(
       tree.unknownItems.map((i) => i.name),
       ['revenue.nb'],

@@ -1,7 +1,7 @@
-import type { EditorProps } from '@/lib/plugin-system';
+import type { ItemRendererProps } from '@/lib/plugin-system';
 
-export default function DatasetEditor({ item }: EditorProps) {
-  const [header = [], ...rows] = (item.content ?? '')
+export default function DatasetEditor({ item }: ItemRendererProps) {
+  const [header = [], ...rows] = (item?.content ?? '')
     .trim()
     .split(/\r?\n/)
     .map((line) => line.split(','));
@@ -12,7 +12,9 @@ export default function DatasetEditor({ item }: EditorProps) {
         <thead>
           <tr>
             {header.map((h, i) => (
-              <th key={`${i}-${h}`} scope="col">{h}</th>
+              <th key={`${i}-${h}`} scope="col">
+                {h}
+              </th>
             ))}
           </tr>
         </thead>

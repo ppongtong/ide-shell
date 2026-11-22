@@ -1,0 +1,1 @@
+export { primaryPlugin } from './plugin';

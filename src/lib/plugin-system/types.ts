@@ -19,7 +19,7 @@ export interface ShellLocation {
   readonly panels: readonly string[];
 }
 
-// ── Core workspace item model & editor contribution point ──
+// ── Workspace items & uniform item renderers ────────────────
 
 export interface Item {
   readonly id: string;
@@ -33,8 +33,23 @@ export interface WorkspaceInfo {
   readonly id: string;
   readonly name: string;
   readonly description?: string;
-  readonly primaryType?: string;
   readonly items: readonly Item[];
+}
+
+export interface ItemRendererProps {
+  readonly workspace: WorkspaceInfo;
+  /** Present for open items and configured primary items; `undefined` when `type: 'primary'` has no key selected yet. */
+  readonly item?: Item;
+}
+
+export interface ItemRenderer {
+  readonly type: string;
+  readonly label: string;
+  /** Plural section heading in the Explorer (defaults to `${label}s`). */
+  readonly pluralLabel?: string;
+  readonly icon: Icon;
+  /** Component rendered in the main pane when active. Omit for plain grouping folders (`type: 'folder'`). */
+  readonly component?: Lazy<ItemRendererProps>;
 }
 
 // ── Activities (activity-bar buttons) ───────────────────────
@@ -96,34 +111,13 @@ export interface SidebarPanel {
   readonly component: Lazy;
 }
 
-// ── Explorer item types ─────────────────────────────────────
-
-export interface EditorProps {
-  readonly workspace: WorkspaceInfo;
-  readonly item: Item;
-}
-
-export interface ItemType {
-  readonly type: string;
-  readonly label: string;
-  /** Plural section heading in the Explorer (defaults to `${label}s`). */
-  readonly pluralLabel?: string;
-  readonly icon: Icon;
-  /** Containers expand/collapse instead of opening a tab. */
-  readonly isContainer?: boolean;
-  /** Pin root items of this type at the top of the Explorer (with clicking label opening Details). */
-  readonly pinnedRoot?: boolean;
-  /** Rendered inside the tab. Omit for containers. */
-  readonly editor?: Lazy<EditorProps>;
-}
-
 // ── Plugin ──────────────────────────────────────────────────
 
 export interface Plugin {
   readonly id: string;
   readonly activities?: readonly Activity[];
   readonly panels?: readonly SidebarPanel[];
-  readonly itemTypes?: readonly ItemType[];
+  readonly itemRenderers?: readonly ItemRenderer[];
 }
 
 /** Identity helper for autocomplete and type checks. */

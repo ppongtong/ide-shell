@@ -15,7 +15,6 @@ import { Route as WorkspacesRouteRouteImport } from './routes/workspaces/route'
 import { Route as ActivityIdSplatRouteImport } from './routes/$activityId/$'
 import { Route as WorkspacesIndexRouteImport } from './routes/workspaces/index'
 import { Route as WorkspacesWsIdRouteImport } from './routes/workspaces/$wsId'
-import { Route as WorkspacesNewRouteImport } from './routes/workspaces/new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -47,11 +46,6 @@ const WorkspacesWsIdRoute = WorkspacesWsIdRouteImport.update({
   path: '/$wsId',
   getParentRoute: () => WorkspacesRouteRoute,
 } as any)
-const WorkspacesNewRoute = WorkspacesNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => WorkspacesRouteRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -59,7 +53,6 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/$activityId/$': typeof ActivityIdSplatRoute
   '/workspaces/$wsId': typeof WorkspacesWsIdRoute
-  '/workspaces/new': typeof WorkspacesNewRoute
   '/workspaces/': typeof WorkspacesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -67,7 +60,6 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/$activityId/$': typeof ActivityIdSplatRoute
   '/workspaces/$wsId': typeof WorkspacesWsIdRoute
-  '/workspaces/new': typeof WorkspacesNewRoute
   '/workspaces': typeof WorkspacesIndexRoute
 }
 export interface FileRoutesById {
@@ -77,7 +69,6 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/$activityId/$': typeof ActivityIdSplatRoute
   '/workspaces/$wsId': typeof WorkspacesWsIdRoute
-  '/workspaces/new': typeof WorkspacesNewRoute
   '/workspaces/': typeof WorkspacesIndexRoute
 }
 export interface FileRouteTypes {
@@ -88,16 +79,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/$activityId/$'
     | '/workspaces/$wsId'
-    | '/workspaces/new'
     | '/workspaces/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/settings'
-    | '/$activityId/$'
-    | '/workspaces/$wsId'
-    | '/workspaces/new'
-    | '/workspaces'
+  to: '/' | '/settings' | '/$activityId/$' | '/workspaces/$wsId' | '/workspaces'
   id:
     | '__root__'
     | '/'
@@ -105,7 +89,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/$activityId/$'
     | '/workspaces/$wsId'
-    | '/workspaces/new'
     | '/workspaces/'
   fileRoutesById: FileRoutesById
 }
@@ -160,25 +143,16 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkspacesWsIdRouteImport
       parentRoute: typeof WorkspacesRouteRoute
     }
-    '/workspaces/new': {
-      id: '/workspaces/new'
-      path: '/new'
-      fullPath: '/workspaces/new'
-      preLoaderRoute: typeof WorkspacesNewRouteImport
-      parentRoute: typeof WorkspacesRouteRoute
-    }
   }
 }
 
 interface WorkspacesRouteRouteChildren {
   WorkspacesWsIdRoute: typeof WorkspacesWsIdRoute
-  WorkspacesNewRoute: typeof WorkspacesNewRoute
   WorkspacesIndexRoute: typeof WorkspacesIndexRoute
 }
 
 const WorkspacesRouteRouteChildren: WorkspacesRouteRouteChildren = {
   WorkspacesWsIdRoute: WorkspacesWsIdRoute,
-  WorkspacesNewRoute: WorkspacesNewRoute,
   WorkspacesIndexRoute: WorkspacesIndexRoute,
 }
 

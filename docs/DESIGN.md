@@ -12,8 +12,8 @@ IDE Shell is a VS Code–style web app shell built with **React 19.3**, **TanSta
 
 - **What it provides:**
   - A fixed outer frame: left Activity Bar, top Breadcrumb bar, main page area, and a shared modal host.
-  - A boot-time plugin registry so features (`workspace`, `explorer`, `agent`, `notebook`, `reports`, `settings`) contribute buttons, sidebar panels, pages, and item-type editors without importing each other's internals.
-  - A typed plugin contract pattern (`createPluginBridge` in `lib/plugin-system` + `src/features/<name>/contract.ts`): in-house `workspace` and `explorer` features demonstrate bidirectional cross-plugin state sharing consumed by `agent` and breadcrumbs, while all features read route-agnostic shell state (`useShellLocation`).
+  - A boot-time plugin registry so features (`workspace`, `primary`, `explorer`, `agent`, `notebook`, `reports`, `settings`) contribute buttons, dialogs, sidebar panels, pages, and uniform `itemRenderers` (including the pinned `type: 'primary'` tab) without importing each other's internals.
+  - A typed plugin contract pattern (`createPluginBridge` in `lib/plugin-system` + `src/features/<name>/contract.ts`): in-house `workspace` and `explorer` features demonstrate bidirectional cross-plugin state sharing consumed by `primary`, `agent`, and breadcrumbs, while all features read route-agnostic shell state (`useShellLocation`).
 - **What it intentionally leaves out (for now):**
   - Real backend persistence (`workspaces.ts` and `agent.ts` use in-memory mock data that resets on a full browser reload).
   - Runtime plugin installation/unloading (all plugins are registered once at startup in `src/app/plugins.ts`).
@@ -29,12 +29,12 @@ IDE Shell is a VS Code–style web app shell built with **React 19.3**, **TanSta
 +------+-----------------------------------------------------------------------+
 | Act  | Breadcrumbs: Workspaces > [Acme v] > Storefront Core > checkout.ts    |
 | Bar  +-------------------------+---------------------------------------------+
-|      | EXPLORER                | [Details] [checkout.ts x] [utils.ts x]      |
+|      | EXPLORER                | [Primary Key] [checkout.ts x] [utils.ts x]  |
 | [WS] | v [Key] Storefront Core +---------------------------------------------+
 | [Ag] |     catalog.csv         |                                             |
 | [Rp] |     checkout.ts         |   EditorHost                                |
-|      | v Files (3)             |   - Pinned Details tab (always index 0)     |
-|      |     App.tsx             |   - Open file / dataset editors             |
+|      | v Files (3)             |   - Pinned Primary tab (index 0, primary)   |
+|      |     App.tsx             |   - Open file / dataset / notebook tabs     |
 |      |     README.md           |   (hidden tabs stay mounted in Activity)    |
 |      |     utils.ts            |                                             |
 |      | v Datasets (1)          |                                             |
@@ -47,10 +47,10 @@ IDE Shell is a VS Code–style web app shell built with **React 19.3**, **TanSta
 +------+-------------------------+---------------------------------------------+
 ```
 
-- **Activity Bar** (`48px`, left): Top group holds area/panel buttons (`Workspaces`, `Agent`, `Reports`). Bottom group holds utility buttons (`New workspace`, `Keyboard shortcuts` dialog, `Settings`).
-- **Breadcrumbs** (`30px`, top): Built from the active nested routes. Inside a workspace, shows a workspace `<select>` switcher plus clickable parent nodes (or `Details` when the pinned Details tab is active).
+- **Activity Bar** (`48px`, left): Top group holds area/panel buttons (`Workspaces`, `Agent`, `Reports`). Bottom group holds utility buttons (`New workspace` dialog, `Keyboard shortcuts` dialog, `Settings`).
+- **Breadcrumbs** (`30px`, top): Built from the active nested routes. Inside a workspace, shows a workspace `<select>` switcher plus clickable parent nodes (or the primary item / `Primary Key` label when the pinned Primary tab is active).
 - **Sidebar** (`260px` desktop / `44vw` phone): Stacked panels managed by `ResizableStack`. `Explorer` is always visible; optional panels like `Agent` appear when listed in `?panels=`.
-- **TabBar + EditorHost** (right): The **Details** tab is always pinned at index `0` with no close button. User-opened files and datasets appear as closable tabs to its right.
+- **TabBar + EditorHost** (right): The **Primary** tab (`type: 'primary'`) is always pinned at index `0` with no close button and renders the registered `primary` `ItemRenderer` (`PrimaryKeyComponent`). Other items with a `component` (`file`, `dataset`, `notebook`) open as closable tabs to its right.
 
 ### 2.2 React Component Tree
 
@@ -64,28 +64,23 @@ flowchart TD
     Root --> ActivityBar["ActivityBar"]
     Root --> Breadcrumbs["Breadcrumbs"]
     Root --> Outlet["main -> Outlet (active route)"]
-    Root --> DialogHost["DialogHost -> Modal -> ShortcutsDialog"]
+    Root --> DialogHost["DialogHost -> Modal -> NewWorkspaceDialog / ShortcutsDialog"]
 
     ActivityBar --> ActivityBtn["ActivityBarButton (x N)"]
 
     Outlet --> ListPage["/workspaces/ -> WorkspaceListPage"]
-    Outlet --> NewPage["/workspaces/new -> NewWorkspacePage"]
     Outlet --> DetailPage["/workspaces/$wsId -> WorkspaceDetailPage"]
     Outlet --> SettingsPage["/settings -> SettingsPage"]
     Outlet --> PluginHost["/$activityId/$ -> PluginPageHost -> ReportsPage"]
 
     DetailPage --> Sidebar["SidebarPanels (container=workspace.detail) -> ResizableStack"]
-    DetailPage --> TabBar["TabBar (pinned Details + open tabs)"]
+    DetailPage --> TabBar["TabBar (pinned Primary + open tabs)"]
     DetailPage --> EditorHost["EditorHost"]
-
-    NewPage --> SidebarDraft["SidebarPanels (allowOptional=false)"]
-    NewPage --> TabBarDraft["TabBar (Details only)"]
-    NewPage --> EditorDraft["EditorHost (Details draft form)"]
 
     Sidebar --> ActExp["Activity: ExplorerPanel"]
     Sidebar --> ActAg["Activity: AgentPanel"]
 
-    EditorHost --> ActDet["Activity: WorkspaceDetailsTab"]
+    EditorHost --> ActPri["Activity: PrimaryKeyComponent (type: primary)"]
     EditorHost --> ActEd["Activity: FileEditor / DatasetEditor / NotebookEditor"]
 ```
 
@@ -99,7 +94,7 @@ To keep features independent while letting any plugin expose shareable state, `e
 flowchart TD
     App["src/app/ (startup wiring)"] --> Shell["src/app/shell/ (outer frame)"]
     App --> Routes["src/routes/ (thin URL definitions)"]
-    App --> Features["src/features/* index.ts (workspace, explorer, agent, reports, settings)"]
+    App --> Features["src/features/* index.ts (workspace, primary, explorer, agent, notebook, reports, settings)"]
 
     Routes --> Shell
     Routes --> Features
@@ -122,7 +117,7 @@ flowchart TD
 | --- | --- | --- | --- |
 | `src/app/` & `src/routes/` | Startup & thin route files | `@/features/<name>` (`index.ts`), `app/shell`, `lib`, `stores` | Deep `@/features/<name>/**` |
 | `src/app/shell/` | `Shell`, `ActivityBar`, `Breadcrumbs`, `DialogHost`, `PluginPageHost` | `lib`, `stores`, `components` | `features`, `routes` |
-| `src/features/<name>/**` | Self-contained plugins (`workspace`, `explorer`, `agent`, `reports`, `settings`) | `lib`, `stores`, `components`, `@/features/<other>/contract`, own relative files | `app`, `routes`, sibling feature barrels & internals (both `@/` and `../`) |
+| `src/features/<name>/**` | Self-contained plugins (`workspace`, `primary`, `explorer`, `agent`, `notebook`, `reports`, `settings`) | `lib`, `stores`, `components`, `@/features/<other>/contract`, own relative files | `app`, `routes`, sibling feature barrels & internals (both `@/` and `../`) |
 | `src/features/*/contract.ts` | Shareable plugin state & actions (`createPluginBridge`) | `@/lib/plugin-system` | `app`, `routes`, `features`, `stores`, `components`, relative files |
 | `src/stores/` | Shell-wide state (`shell-store.ts`, `persist.ts`) | `lib` | `app`, `routes`, `features`, `components` |
 | `src/lib/` | Plugin SDK (`types.ts`, `bridge.ts`, `registry.ts`, `search-params.ts`, `shell-location.ts`, `router-types.ts`) | External packages only | All app folders above it |
@@ -134,7 +129,7 @@ flowchart TD
 
 ### 4.1 File-Based Route Tree
 
-TanStack Router's Vite plugin watches `src/routes/` and generates `src/routeTree.gen.ts`. Static routes always match ahead of dynamic params (`$wsId` and `$activityId`), so `/workspaces/new` matches before `/workspaces/$wsId`, and `/settings` matches before `/$activityId/$`.
+TanStack Router's Vite plugin watches `src/routes/` and generates `src/routeTree.gen.ts`. Static routes always match ahead of dynamic params (`$activityId`), so `/workspaces` and `/settings` match before `/$activityId/$`.
 
 ```mermaid
 flowchart TD
@@ -145,7 +140,6 @@ flowchart TD
     Root --> CatchAll["$activityId/$.tsx: /$activityId/$ (PluginPageHost)"]
 
     WsLayout --> WsIndex["workspaces/index.tsx: /workspaces/ (WorkspaceListPage)"]
-    WsLayout --> WsNew["workspaces/new.tsx: /workspaces/new (crumb: New workspace)"]
     WsLayout --> WsDetail["workspaces/$wsId.tsx: /workspaces/$wsId (container: workspace.detail, loader: get)"]
 ```
 
@@ -157,18 +151,17 @@ Example URL inside a workspace:
   /workspaces / acme  ?  item=file:utils  &  panels=agent
   \_________/   \__/     \_____________/     \__________/
    area home    $wsId      active tab       open optional panels
-                        (omitted = Details)  (comma-separated IDs)
+                        (omitted = Primary) (comma-separated IDs)
 ```
 
-- **Omitted `?item=` means the pinned Details tab is active.** There is no `?item=details` noise in the URL.
+- **Omitted `?item=` means the pinned Primary tab (`type: 'primary'`) is active.** There is no `?item=primary` noise in the URL.
 - **Validation (`validateDetailSearch` in `src/features/workspace/lib/search.ts`):** Rejects malformed keys (missing `:`, empty type, or empty id such as `"abc"`, `":id"`, `"file:"`).
 - **Route-agnostic container metadata (`staticData.container`):** `/workspaces/$wsId` declares `staticData: { container: 'workspace.detail' }`. `useShellLocation()` reads `container`, `pathname`, and `?panels=` in a single structurally-shared subscription, and `ActivityBar` toggles `?panels=` generically via `navigate({ to: '.' })`.
 - **Panel retention:** `/workspaces/$wsId` applies `retainSearchParams(['panels'])`, so switching workspaces or opening tabs keeps `?panels=agent` open automatically.
 - **Browser history policy (`push` vs `replace`):**
-  - **Push** (adds a Back step): Switching areas, switching workspaces, opening a **new** item tab for the first time.
-  - **Replace** (does not clutter Back): Switching to an already-open tab, switching to Details, closing a tab, toggling a sidebar panel (`?panels=`), and redirecting `/workspaces/new` -> `/workspaces/$wsId` after creation.
-- **Reserved slug:** `createSlug` reserves `'new'`, so creating a workspace named `"New"` gets id `new-2` and never collides with `/workspaces/new`.
-- **Longest-prefix activity match:** `registry.activeRouteActivity(path)` sorts route activities by `action.to.length` descending. On `/workspaces/new`, `new-workspace` (`to: '/workspaces/new'`) beats `workspaces` (`to: '/workspaces'`), so only `New workspace` highlights in `ActivityBar` and `Shell`'s `useRememberLastLocation` skips updating `lastHref['workspaces']` (because `new-workspace` does not set `rememberLastLocation`).
+  - **Push** (adds a Back step): Switching areas, switching workspaces, creating a workspace (`NewWorkspaceDialog` -> `/workspaces/$wsId`), and opening a **new** item tab for the first time.
+  - **Replace** (does not clutter Back): Switching to an already-open tab, switching to the pinned Primary tab, closing a tab, and toggling a sidebar panel (`?panels=`).
+- **Longest-prefix activity match:** `registry.activeRouteActivity(path)` sorts route activities by `action.to.length` descending so `ActivityBar` highlights the most specific matching route activity and `Shell` records `lastHref` only for activities with `rememberLastLocation: true`.
 - **Hosting modes (`src/app/router.ts`):**
   - Local dev (`npm run dev`): Browser history (`/workspaces/acme`) — Vite serves `index.html` on refresh.
   - Static demo / GitHub Pages (`npm run build:demo`): Hash history (`#/workspaces/acme`) — refreshes and deep links work on static hosts without 404s.
@@ -177,8 +170,8 @@ Example URL inside a workspace:
 
 Routes declare breadcrumbs in `staticData` (typed via module augmentation in `src/lib/plugin-system/router-types.ts`):
 
-- `crumb?: (params, registry) => string` for plain text labels (`Workspaces`, `New workspace`, `Settings`, `Reports`).
-- `Breadcrumbs?: ComponentType` for interactive segments (`WorkspaceBreadcrumbs`, rendering the workspace `<select>` switcher + clickable parent folders or `Details`).
+- `crumb?: (params, registry) => string` for plain text labels (`Workspaces`, `Settings`, `Reports`).
+- `Breadcrumbs?: ComponentType` for interactive segments (`WorkspaceBreadcrumbs`, rendering the workspace `<select>` switcher + clickable parent containers or the primary item / `Primary Key` label).
 
 `app/shell/Breadcrumbs.tsx` subscribes to a structurally-shared route slice (so `?item=` and `?panels=` changes do not re-render the shell bar), waits for `status === 'success'` before rendering a custom component, and wraps it in `<Suspense>`.
 
@@ -213,9 +206,9 @@ flowchart LR
     end
 
     subgraph Local["5. Local useState inside React Activity"]
-      C1["FileEditor: unsaved text (per workspace)"]
+      C1["FileEditor / NotebookEditor: unsaved edits & cell output"]
       C2["AgentPanel: per-workspace chat history"]
-      C3["WorkspaceDetailsTab: form draft / edits"]
+      C3["PrimaryKeyComponent: key selector selection"]
     end
 ```
 
@@ -228,15 +221,15 @@ flowchart LR
 | `useWorkbench` | `features/workspace/stores/workbench.ts` | Yes (`ide:workspace`, `version: 3`) | Selector with frozen `EMPTY` fallback, or `.getState()` in handlers | Open tab strips & panel ratios survive refresh |
 | `useExplorerStore` | `features/explorer/stores/explorer-store.ts` | Yes (`ide:explorer`, `version: 1`) | Selector with frozen `EMPTY` fallback | Explorer collapsed folders/groups survive refresh |
 | `useShell` | `stores/shell-store.ts` | No (cleared on Reset) | Selector (`openDialog`) or `.getState()` (`lastHref`) | Back button should not reopen modals; session-only memory |
-| `useWorkspaceContract` | `features/workspace/contract.ts` | No | Narrow primitive selectors in render; `.getState()` in handlers | Lets `explorer`, `agent`, and future plugins read/act on workspaces |
+| `useWorkspaceContract` | `features/workspace/contract.ts` | No | Narrow primitive selectors in render; `.getState()` in handlers | Lets `primary`, `explorer`, `agent`, and future plugins read/act on workspaces |
 | `useExplorerContract` | `features/explorer/contract.ts` | No | Selector or `.getState()` in handlers | Reference example: lets `workspace` breadcrumbs & `agent` reveal/collapse Explorer nodes |
-| Local `useState` | `FileEditor`, `AgentPanel`, `WorkspaceDetailsTab` | No (kept alive by `Activity` while route stays mounted) | Normal React state | Survives tab/panel switches inside a workspace without a global drafts store |
+| Local `useState` | `FileEditor`, `NotebookEditor`, `AgentPanel`, `PrimaryKeyComponent` | No (kept alive by `Activity` while route stays mounted) | Normal React state | Survives tab/panel switches inside a workspace without a global drafts store |
 
 ### 5.2 Important Persistence & Performance Boundaries
 
-- **What survives switching tabs inside the same workspace:** Unsaved `FileEditor` text, `WorkspaceDetailsTab` edits, and `AgentPanel` chat all survive because `EditorHost` and `ResizableStack` keep hidden children mounted inside React `<Activity>`.
+- **What survives switching tabs inside the same workspace:** Unsaved `FileEditor` text, `NotebookEditor` cell output, `PrimaryKeyComponent` state, and `AgentPanel` chat all survive because `EditorHost` and `ResizableStack` keep hidden children mounted inside React `<Activity>`.
 - **Synchronous contract sync (`useLayoutEffect`) & no-op persistence guards:** `useSyncWorkspaceContract` and `ExplorerPanel` publish snapshots via `useLayoutEffect` (zero 1-frame lag), and `useWorkbench` / `useExplorerStore` check `get()` before calling `set()` so Zustand `persist` never writes unchanged state to `localStorage`.
-- **Zero shell/panel re-render cascades on tab switch:** `useShellLocation` omits `?item=`, `Shell` records `lastHref` via `router.subscribe('onResolved')`, `ActivityBar` reads `lastHref` via `.getState()` on click, `ExplorerPanel` caches `buildExplorerTree` strictly on `(items, itemTypes)`, and `AgentPanel` selects primitive fields (`wsId`, `wsName`, `activeName`).
+- **Zero shell/panel re-render cascades on tab switch:** `useShellLocation` omits `?item=`, `Shell` records `lastHref` via `router.subscribe('onResolved')`, `ActivityBar` reads `lastHref` via `.getState()` on click, `ExplorerPanel` caches `buildExplorerTree` strictly on `(items, itemRenderers)`, and `AgentPanel` selects primitive fields (`wsId`, `wsName`, `activeName`).
 - **Zero React renders during 120 Hz sidebar resize:** `ResizableStack` updates `flexGrow` and `aria-valuenow` directly via DOM refs on `pointermove` and commits once on `pointerup`.
 - **In-memory reset (`src/stores/persist.ts`):** `workbench.ts`, `explorer-store.ts`, and `shell-store.ts` register reset callbacks via `registerResetter(...)`. Clicking reset in Settings runs `resetAllPersisted()`, clearing tabs, panel sizes, collapsed folders, `lastHref`, and `ide:*` keys in `localStorage` without `location.reload()`.
 
@@ -244,23 +237,23 @@ flowchart LR
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Draft: Click "New workspace" (/workspaces/new)
-    Draft --> Draft: Edit Name, Primary Type, Description
-    Draft --> Cancelled: Click Cancel (navigate /workspaces)
-    Cancelled --> [*]
-    Draft --> SavedWorkspace: Submit valid form (replace -> /workspaces/$wsId)
+    [*] --> Dialog: Click "New workspace" (NewWorkspaceDialog)
+    Dialog --> [*]: Cancel / Esc
+    Dialog --> SavedWorkspace: Submit Name + Description (navigate -> /workspaces/$wsId)
 
     state SavedWorkspace {
-      [*] --> SavedDetails
-      SavedDetails: Pinned Details Tab Active (no ?item=)
+      [*] --> UnselectedPrimary: items is empty (item === undefined)
+      UnselectedPrimary: Pinned Primary Tab renders PrimaryKeySelector
+      ConfiguredPrimary: Pinned Primary Tab renders PrimaryKeyDetail (no ?item=)
       ItemTabActive: Item Tab Active (?item=type:id)
       ItemTabHidden: Item Tab Mounted Hidden (React Activity)
 
-      SavedDetails --> ItemTabActive: Click leaf item in Explorer
-      ItemTabActive --> SavedDetails: Click Details tab or primary root
+      UnselectedPrimary --> ConfiguredPrimary: Select key -> actions.setPrimaryItem(...)
+      ConfiguredPrimary --> ItemTabActive: Click openable item in Explorer
+      ItemTabActive --> ConfiguredPrimary: Click Primary tab or primary root
       ItemTabActive --> ItemTabHidden: Switch to another tab
       ItemTabHidden --> ItemTabActive: Click tab in TabBar
-      ItemTabActive --> SavedDetails: Close last closable tab
+      ItemTabActive --> ConfiguredPrimary: Close last closable tab
     }
 ```
 
@@ -271,8 +264,8 @@ Plugins never import another plugin's internal files (`stores/`, `components/`, 
 | Public API | Import Path | Available When | What It Provides |
 | --- | --- | --- | --- |
 | **`useShellLocation()`** | `@/lib/plugin-system` | Always | `{ path, container, panels }` — current URL path, active container ID (e.g. `'workspace.detail'`), and open optional `?panels=` |
-| **`useRegistry()`** | `@/lib/plugin-system` | Always | Boot-time plugin contributions: `plugins`, `activity`, `panel`, `itemType`, `panelsFor(container)`, `activeRouteActivity(path)` |
-| **`useWorkspaceContract`** | `@/features/workspace/contract` | On `/workspaces/new` & `/workspaces/$wsId` (`null` elsewhere) | `current`: `{ workspace, isDraft, activeKey, activeItem, openItems }`<br>`actions`: `{ isActiveWorkspace(wsId), showDetails(), openItem(itemId), closeItem(itemId) }` |
+| **`useRegistry()`** | `@/lib/plugin-system` | Always | Boot-time plugin contributions: `plugins`, `activity`, `panel`, `itemRenderer`, `panelsFor(container)`, `activeRouteActivity(path)` |
+| **`useWorkspaceContract`** | `@/features/workspace/contract` | On `/workspaces/$wsId` (`null` elsewhere) | `current`: `{ workspace, activeKey, activeItem, openItems }`<br>`actions`: `{ isActiveWorkspace(wsId), showPrimary(), setPrimaryItem(input), openItem(itemId), closeItem(itemId) }` |
 | **`useExplorerContract`** | `@/features/explorer/contract` | While `ExplorerPanel` is mounted (`null` if unloaded/unmounted) | `current`: `{ workspaceId, collapsedIds }`<br>`actions`: `{ revealItems(wsId, nodeIds), collapseAll(), expandAll() }` |
 | **`resetAllPersisted()`** | `@/stores/persist` | Always | Resets all registered persisted stores (`ide:*`) and shell `lastHref` in memory |
 
@@ -287,7 +280,7 @@ enabledWhen: (loc) => loc.container === 'workspace.detail',
 // Inside any plugin component:
 const { path, container, panels } = useShellLocation();
 const registry = useRegistry();
-const itemMeta = registry.itemType.get('file');
+const fileRenderer = registry.itemRenderer.get('file');
 ```
 
 #### 2. Consuming Another Plugin's State & Actions (`@/features/<name>/contract`)
@@ -300,7 +293,7 @@ Follow **three rules** to prevent unnecessary re-renders and handle optional plu
    import { useWorkspaceContract } from '@/features/workspace/contract';
    import { useExplorerContract } from '@/features/explorer/contract';
 
-   const wsName = useWorkspaceContract((s) => s.current?.workspace?.name);
+   const wsName = useWorkspaceContract((s) => s.current?.workspace.name);
    const activeName = useWorkspaceContract((s) => s.current?.activeItem?.name);
    const collapsedIds = useExplorerContract((s) => s.current?.collapsedIds ?? EMPTY);
    ```
@@ -314,7 +307,7 @@ Follow **three rules** to prevent unnecessary re-renders and handle optional plu
    // Async handler — snapshot before await, verify still in workspace after await:
    const asked = useWorkspaceContract.getState().current;
    const reply = await myAsyncTask(asked);
-   if (asked?.workspace && useWorkspaceContract.getState().actions?.isActiveWorkspace(asked.workspace.id)) {
+   if (asked && useWorkspaceContract.getState().actions?.isActiveWorkspace(asked.workspace.id)) {
      useWorkspaceContract.getState().actions?.openItem('utils');
    }
    ```
@@ -323,7 +316,7 @@ Follow **three rules** to prevent unnecessary re-renders and handle optional plu
 #### 3. Publishing Shareable State from Your Own Plugin
 
 Only add stores that your plugin actually needs:
-- **0 stores** (`reports`, `settings`): No `localStorage` persistence and nothing shared with other plugins.
+- **0 stores** (`primary`, `notebook`, `reports`, `settings`): No `localStorage` persistence and nothing shared with other plugins.
 - **1 store** (`contract.ts` only): Shares live state/actions with other plugins, no `localStorage` persistence needed.
 - **2 stores** (`workspace`, `explorer`): Private `localStorage` store in `stores/` (persisting raw IDs/layout) **plus** public `contract.ts` (exposing live domain state + orchestrated actions).
 
@@ -374,7 +367,7 @@ useLayoutEffect(() => {
 ```mermaid
 flowchart LR
     Plugins["src/app/plugins.ts"] --> Create["createRegistry(plugins)"]
-    Create --> CheckIds["Check unique activity, panel, itemType IDs"]
+    Create --> CheckIds["Check unique activity, panel, itemRenderer IDs"]
     Create --> CheckOrder["Check unique order per position and container"]
     CheckOrder --> CheckRefs["Check togglePanel targets and plugin page routes"]
     CheckRefs --> Index["Build readonly Maps, sorted lists, activeRouteActivity()"]
@@ -406,7 +399,7 @@ sequenceDiagram
     Host->>Host: file:utils -> Activity mode="visible"
 ```
 
-### 6.3 Cross-Plugin State Sharing (`workspace` <-> `explorer` <-> `agent`)
+### 6.3 Cross-Plugin State Sharing (`workspace` <-> `primary` <-> `explorer` <-> `agent`)
 
 ```mermaid
 sequenceDiagram
@@ -418,7 +411,7 @@ sequenceDiagram
     participant API as agentApi
 
     Page->>WsC: setSnapshot({ workspace, activeKey, activeItem, openItems })
-    Page->>WsC: setActions({ showDetails, openItem, closeItem })
+    Page->>WsC: setActions({ isActiveWorkspace, showPrimary, setPrimaryItem, openItem, closeItem })
     WsC-->>Exp: Renders Explorer tree
     Exp->>ExpC: setSnapshot({ workspaceId, collapsedIds })
     Exp->>ExpC: setActions({ revealItems, collapseAll, expandAll })
@@ -427,7 +420,7 @@ sequenceDiagram
     Agent->>WsC: getState().current (before await)
     Agent->>API: ask("open checkout.ts", askedSnapshot)
     API-->>Agent: Reply with workspace action openItem
-    Agent->>WsC: Re-verify workspace.id (after await)
+    Agent->>WsC: actions.isActiveWorkspace(asked.workspace.id) (after await)
     alt Still in same workspace and no pending navigation away
       Agent->>WsC: actions.openItem("primary-storefront-checkout")
       WsC->>Page: openTab + router.navigate
@@ -441,54 +434,52 @@ sequenceDiagram
 
 ## 7. Critical User Journeys (CUJs) & Critical User Interactions (CUIs)
 
-### CUJ 1: Create a New Workspace with Required Primary Root
+### CUJ 1: Create a New Workspace & Select Its Primary Key
 
-**User goal:** Start a new workspace, choose its primary type, and immediately see the seeded primary root node and grouped Explorer.
+**User goal:** Create a workspace via the modal dialog, land directly on its pinned Primary tab, and choose its Primary Key to seed the primary root node and linked child items.
 
 ```mermaid
 sequenceDiagram
     actor User
     participant Bar as ActivityBar / WorkspaceListPage
-    participant Router as TanStack Router
-    participant NewPage as NewWorkspacePage
-    participant Details as WorkspaceDetailsTab
+    participant Dialog as NewWorkspaceDialog
     participant API as workspacesApi
+    participant Router as TanStack Router
     participant DetailPage as WorkspaceDetailPage
+    participant Primary as PrimaryKeyComponent
 
     User->>Bar: Click "New workspace"
-    Bar->>Router: navigate(to="/workspaces/new")
-    Router-->>NewPage: Mount draft workbench (isDraft=true)
-    Note over NewPage: Only "New workspace" icon is selected and Agent is disabled
-    Note over NewPage: Explorer shows setup prompt and TabBar shows only Details
+    Bar->>Dialog: useShell.showDialog("new-workspace")
+    User->>Dialog: Type Name + optional Description and click "Create workspace"
+    Dialog->>API: create(name, description) (items = [])
+    API-->>Dialog: Created empty Workspace
+    Dialog->>Router: router.invalidate() + hideDialog() + navigate(/workspaces/$wsId)
+    Router-->>DetailPage: Load & render workspace (pinned Primary tab active)
+    DetailPage-->>Primary: Mount PrimaryKeyComponent (item === undefined)
+    Note over Primary: Explorer shows "Select primary key..." and Primary tab renders PrimaryKeySelector
 
-    User->>Details: Type Name + select Primary Type
-    Details-->>User: Live preview shows primary root + child items
-    User->>Details: Click "Create workspace"
-    Details->>API: create(name, primaryType, description)
-    API->>API: createSlug (reserves "new" -> "new-2") + seed primary root & children
-    API-->>Details: Created Workspace
-    Details->>Router: router.invalidate() (refresh /workspaces list)
-    Details->>Router: navigate(/workspaces/$wsId, replace=true)
-    Router-->>DetailPage: Load & render saved workspace
-    Note over DetailPage: Details tab stays pinned first (Primary Type locked)
-    Note over DetailPage: Explorer shows expanded Primary root + Files + Datasets
+    User->>Primary: Choose Primary Key card and click "Set primary key"
+    Primary->>DetailPage: workspaceContract.actions.setPrimaryItem({ name, content, children })
+    DetailPage->>API: setPrimary(wsId, input)
+    DetailPage->>Router: router.invalidate()
+    Router-->>Primary: Re-render PrimaryKeyComponent with item !== undefined (PrimaryKeyDetail)
+    Note over DetailPage: Explorer shows expanded Primary root + linked child items
 ```
 
 **Critical User Interactions (CUIs) in CUJ 1:**
 
 | Interaction | Trigger | Visual & State Result | Edge Case Handled |
 | --- | --- | --- | --- |
-| Start creation | Click `New workspace` (Activity Bar or Workspaces page) | URL -> `/workspaces/new`, Breadcrumbs -> `Workspaces > New workspace`, only `New workspace` icon selected | `Shell`'s `useRememberLastLocation` calls `activeRouteActivity('/workspaces/new')` -> gets `new-workspace` (no `rememberLastLocation`), so `lastHref['workspaces']` is untouched |
-| Pick Primary Type | Change `<select>` in Details | Preview box updates immediately showing root name + children | Help text sits above `<select>` (`aria-describedby`) so dropdown never covers it |
-| Submit invalid | Submit empty Name (or whitespace-only Name) | Empty input is caught by native HTML `required` validation; whitespace-only input triggers `formAction`'s `role="alert"` error and `aria-invalid="true"` while preserving existing fields | No workspace created, no navigation |
-| Submit valid | Click `Create workspace` | Button shows `"Creating…"` (`useFormStatus`), workspace seeded, URL replaced with `/workspaces/$wsId` | Naming a workspace `"New"` creates id `new-2`; pressing **Back** skips the empty form |
-| Edit saved details | Edit Name/Description on `/workspaces/$wsId` and click `Save changes` | Primary Type remains locked; Name updates in header, breadcrumbs, and switcher; `"Saved"` status appears | Switching workspaces mounts a fresh Details tab (`key="${wsId}:__details__"`) |
+| Open creation dialog | Click `New workspace` (Activity Bar `[+]` or Workspaces page) | `DialogHost` opens `NewWorkspaceDialog` over the current screen without changing the URL | Pressing `Esc` or `Cancel` closes the dialog cleanly without touching browser history or `lastHref` |
+| Submit invalid Name | Submit empty Name (or whitespace-only Name) | Native HTML `required` catches empty input; `formAction` catches whitespace-only input with `role="alert"` and `aria-invalid="true"` | Dialog stays open with typed fields preserved |
+| Create workspace | Click `Create workspace` | Button shows `"Creating…"` (`useFormStatus`), dialog closes, router navigates to `/workspaces/$wsId` | Pinned first tab renders `PrimaryKeyComponent` (`item === undefined`), and Explorer shows `Select primary key…` |
+| Select Primary Key | Choose a Primary Key option in `PrimaryKeySelector` and click `Set primary key` | Calls `actions.setPrimaryItem(...)`, seeds `type: 'primary'` root + linked children, and transitions `PrimaryKeyComponent` in-place to `PrimaryKeyDetail` | Workspace and Explorer stay agnostic of how `PrimaryKeyComponent` renders its selector or detail view |
 
 ---
 
 ### CUJ 2: Explore Items, Edit Files, Switch & Close Tabs
 
-**User goal:** Browse the primary root and Explorer item-type groups, edit files across multiple tabs without losing work, and return cleanly to Details.
+**User goal:** Browse the primary root and Explorer item-type groups, edit files across multiple tabs without losing work, and return cleanly to the pinned Primary tab.
 
 ```mermaid
 sequenceDiagram
@@ -509,7 +500,7 @@ sequenceDiagram
 
     User->>Exp: Click Primary root label "Storefront Core"
     Exp->>Router: Replace ?item=undefined
-    Host-->>User: Pinned Details tab active and Storefront Core row highlighted
+    Host-->>User: Pinned Primary tab active and Storefront Core row highlighted
 
     User->>Bar: Press ArrowRight / Click "checkout.ts"
     Bar->>Router: Replace ?item=file:primary-storefront-checkout
@@ -517,19 +508,19 @@ sequenceDiagram
 
     User->>Bar: Click "x" on active tab(s) until none left
     Bar->>Router: Replace ?item=neighbor (then ?item=undefined)
-    Host-->>User: Lands cleanly on pinned Details tab
+    Host-->>User: Lands cleanly on pinned Primary tab
 ```
 
 **Critical User Interactions (CUIs) in CUJ 2:**
 
 | Interaction | Trigger | Result |
 | --- | --- | --- |
-| Click Primary root **label** | Click `Storefront Core` text in Explorer | Activates pinned **Details** tab (`item: undefined`), clears `lastActive[wsId]`, highlights primary root, and expands children if collapsed |
+| Click Primary root **label** | Click `Storefront Core` text in Explorer | Activates pinned **Primary** tab (`item: undefined`), clears `lastActive[wsId]`, highlights primary root, and expands children if collapsed |
 | Click Primary root **chevron** | Click `v` / `>` button left of label | Collapses/expands children without changing the active editor tab |
-| Click Type group header | Click `Files` or `Datasets` row | Toggles `group:<type>` in `useExplorerStore.collapsed` (persisted in `localStorage`) |
+| Click Type group header | Click `Notebooks`, `Files`, or `Datasets` row | Toggles `group:<type>` in `useExplorerStore.collapsed` (persisted in `localStorage`) |
 | Click a breadcrumb parent | Click `Storefront Core` in top breadcrumbs | Calls `useExplorerContract` `revealItems` to un-collapse it in Explorer |
-| Keyboard tab switching | Focus active tab, press `ArrowLeft` / `ArrowRight` / `Home` / `End` | Moves focus and activates tabs across `[Details, ...openTabs]` with roving `tabIndex` |
-| Deep-link invalid `?item=` | Visit `/workspaces/acme?item=folder:src` or `?item=bad` | Malformed syntax (`bad`) is stripped by `validateDetailSearch`; well-formed unknown/container keys (`folder:src`) are **not** persisted to `localStorage`, and `EditorHost` displays an inline `"not in this workspace"` / `"No editor registered"` message |
+| Keyboard tab switching | Focus active tab, press `ArrowLeft` / `ArrowRight` / `Home` / `End` | Moves focus and activates tabs across `[Primary, ...openTabs]` with roving `tabIndex` |
+| Deep-link invalid `?item=` | Visit `/workspaces/acme?item=folder:src` or `?item=bad` | Malformed syntax (`bad`) is stripped by `validateDetailSearch`; well-formed unknown/non-rendered keys (`folder:src`) are **not** persisted to `localStorage`, and `EditorHost` displays an inline `"not in this workspace"` / `"No renderer registered"` message |
 
 ---
 
@@ -568,7 +559,7 @@ sequenceDiagram
 
 | Interaction | Trigger | Result |
 | --- | --- | --- |
-| Switch workspace | Change `<select>` in breadcrumbs | Keeps `?panels=` open (`retainSearchParams`), lands on target workspace's `lastActive` tab (or Details); `AgentPanel` keeps separate `history[wsId]` |
+| Switch workspace | Change `<select>` in breadcrumbs | Keeps `?panels=` open (`retainSearchParams`), lands on target workspace's `lastActive` tab (or pinned Primary tab); `AgentPanel` keeps separate `history[wsId]` |
 | Return to area | Click unselected `Workspaces` or `Reports` icon | Restores exact `lastHref` (including search params or `/reports/q1`) |
 | Go up inside area | Click already-selected `Workspaces` icon while inside `/workspaces/acme` | Navigates up to `/workspaces` list |
 | Workspace isolation | Switch `Acme` <-> `Globex` | `EditorHost` keys `Activity` by `${workspace.id}:${key}`, preventing cross-workspace file leaks (note: unsaved edits in `Acme` unmount on workspace switch) |
@@ -626,7 +617,7 @@ sequenceDiagram
 | --- | --- | --- |
 | Reset layout | `/settings` -> `Close all tabs and reset panel sizes` | Calls `resetAllPersisted()` (resets `useWorkbench`, `useExplorerStore`, and `useShell.lastHref` in-memory + clears `ide:*` in `localStorage` without `location.reload()`, keeping in-memory created workspaces). |
 | Browse plugin sub-views | `/reports` -> click `Q1 revenue` -> `/reports/q1` | Handled by catch-all `/$activityId/$` -> `PluginPageHost` -> lazy `ReportsPage` (`subPath="q1"`), updating document `<title>` |
-| Open/dismiss modal dialog | Activity Bar `[?]` (`Keyboard shortcuts` -> `ShortcutsDialog`) or any `kind: 'dialog'` plugin | `DialogHost` opens native `<dialog closedby="any">` via `showModal()`; `Esc`, `Done`, and backdrop click all route through `onClose` -> `hideDialog`; Safari fallback checks pointerdown + bounding box so text-selection drags don't dismiss the modal |
+| Open/dismiss modal dialog | Activity Bar `[+]` (`NewWorkspaceDialog`), `[?]` (`ShortcutsDialog`), or any `kind: 'dialog'` plugin | `DialogHost` opens native `<dialog closedby="any">` via `showModal()`; `Esc`, `Done`/`Cancel`, and backdrop click all route through `onClose` -> `hideDialog`; Safari fallback checks pointerdown + bounding box so text-selection drags don't dismiss the modal |
 
 ---
 
@@ -637,26 +628,35 @@ To add a brand-new plugin, export it with `definePlugin(...)` from `src/features
 | Goal | What to change |
 | --- | --- |
 | Share state/actions with other plugins | Export `createPluginBridge<Snapshot, Actions>()` from `src/features/<name>/contract.ts` (follow `src/features/explorer/contract.ts`). Other features import `@/features/<name>/contract`. |
-| Add a new Explorer item-type renderer | Add `{ type, label, pluralLabel, icon, editor: lazy(...) }` to `itemTypes` in a plugin (see `src/features/notebook/plugin.ts`). `ExplorerPanel`, `TabBar`, and `EditorHost` pick it up automatically. |
+| Add a new Explorer item renderer | Add `{ type, label, pluralLabel?, icon, component: lazy(...) }` to `itemRenderers` in a plugin (`src/features/notebook/plugin.ts`). `ExplorerPanel`, `TabBar`, and `EditorHost` pick it up automatically. |
+| Customize or swap the pinned Primary renderer | Update or replace `src/features/primary/plugin.ts` (`type: 'primary'`). Its `component` receives `{ workspace, item }` (`item === undefined` before selection) and calls `useWorkspaceContract.getState().actions?.setPrimaryItem(...)` when selected. |
 | Add a new sidebar panel + toggle button | Add a `panels` entry (`container: 'workspace.detail'`) and an `activities` entry with `action: { kind: 'togglePanel', panelId }`. |
 | Add a standalone plugin page | Add an `activities` entry with `action: { kind: 'route', to: '/<id>', page: lazy(...) }`. No file in `src/routes/` needed. |
-| Add a new primary workspace type | Add an entry to `PRIMARY_TYPES` in `src/features/workspace/api/workspaces.ts` (or load options from your backend via a `loader` on `src/routes/workspaces/new.tsx`). |
-| Add a new dialog button | Add an `activities` entry with `action: { kind: 'dialog', dialog: lazy(...) }` (see `ShortcutsDialog` in `src/features/settings/`). |
+| Add a new dialog button | Add an `activities` entry with `action: { kind: 'dialog', dialog: lazy(...) }` (see `NewWorkspaceDialog` in `src/features/workspace/` and `ShortcutsDialog` in `src/features/settings/`). |
 | Connect a real backend | Replace the mock bodies in `src/features/workspace/api/workspaces.ts` and `src/features/agent/api/agent.ts` with `fetch` calls. Keep `router.invalidate()` after mutations. |
 
-### 8.1 Registering Item-Type Renderers (`workspace/plugin.ts` vs `src/features/<name>/plugin.ts`)
+### 8.1 Uniform `ItemRenderer` Mapping (`primary`, `notebook`, and Core Types)
 
-`createRegistry(plugins)` merges `itemTypes` across every loaded plugin (`plugins.flatMap((p) => p.itemTypes ?? [])`). Both options use the exact same `ItemType` contract—choose based on ownership and complexity:
+`createRegistry(plugins)` merges `itemRenderers` across every loaded plugin (`plugins.flatMap((p) => p.itemRenderers ?? [])`). Every item `type` uses the **exact same `ItemRenderer` contract**—with no `isPrimary`, `isContainer`, or split `editor`/`details` flags:
 
-1. **Core / lightweight viewer (`src/features/workspace/plugin.ts`):**
-   Use when the renderer is 1–2 small files with no independent store, API, sidebar panel, or cross-plugin `contract.ts` (like `FileEditor` and `DatasetEditor` in `src/features/workspace/editors/`).
-2. **Standalone feature plugin (`src/features/<name>/plugin.ts`):**
-   Use when the renderer is a full feature domain—owning its own state/stores, API calls, panels, buttons, or `contract.ts`, or when you want to toggle/maintain it independently without growing `features/workspace/` into a monolith (since ESLint blocks `workspace/` from importing editors out of sibling feature folders).
+```ts
+export interface ItemRendererProps {
+  readonly workspace: WorkspaceInfo;
+  readonly item?: Item;
+}
 
-Reference implementation in `src/features/notebook/`:
-- `src/features/notebook/editors/NotebookEditor.tsx` — receives `EditorProps` (`{ workspace, item }`), renders interactive runnable cells, and preserves run output across tab switches via `EditorHost`'s `<Activity>`.
-- `src/features/notebook/plugin.ts` — maps `type: 'notebook'` -> `lazy(() => import('./editors/NotebookEditor'))` with `icon: BookOpen` and `pluralLabel: 'Notebooks'`.
-- `src/app/plugins.ts` — registers `notebookPlugin`; `ExplorerPanel` automatically adds a collapsible **Notebooks** section (`revenue.nb` in `Acme`), `TabBar` renders the tab icon, and `EditorHost` lazy-loads `NotebookEditor` on first open.
+export interface ItemRenderer {
+  readonly type: string;
+  readonly label: string;
+  readonly pluralLabel?: string;
+  readonly icon: ComponentType<{ size?: number }>;
+  readonly component?: LazyExoticComponent<ComponentType<ItemRendererProps>>;
+}
+```
+
+- **Pinned Primary renderer (`src/features/primary/plugin.ts`):** Registers `type: 'primary'` -> `PrimaryKeyComponent`. `EditorHost` mounts it in the pinned first tab (`?item=` omitted). When `item === undefined` (new workspace), `PrimaryKeyComponent` renders `PrimaryKeySelector` and signals selection via `useWorkspaceContract.getState().actions?.setPrimaryItem(...)`; when `item !== undefined`, it renders `PrimaryKeyDetail`. Neither `workspace` nor `explorer` knows how `PrimaryKeyComponent` renders its internal states.
+- **Standalone feature renderer (`src/features/notebook/plugin.ts`):** Registers `type: 'notebook'` -> `NotebookEditor` (`pluralLabel: 'Notebooks'`). `ExplorerPanel` groups top-level notebooks under **Notebooks**, `TabBar` renders the tab icon, and `EditorHost` lazy-loads `NotebookEditor` inside `<Activity>` so cell outputs survive tab switches.
+- **Core lightweight viewers & grouping nodes (`src/features/workspace/plugin.ts`):** Registers `file` (`FileEditor`), `dataset` (`DatasetEditor`), and `folder` (`component` omitted—any item with `parentId` children gets a collapsible chevron in Explorer, and clicking an item without a `component` toggles expand/collapse). Unregistered backend item types fall back cleanly into Explorer's **Other** group.
 
 ---
 

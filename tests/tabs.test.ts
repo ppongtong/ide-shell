@@ -10,9 +10,9 @@ const Icon = () => null;
 
 const testPlugin: Plugin = {
   id: 'test.ws',
-  itemTypes: [
-    { type: 'folder', label: 'Folder', icon: Icon, isContainer: true },
-    { type: 'file', label: 'File', icon: Icon },
+  itemRenderers: [
+    { type: 'folder', label: 'Folder', icon: Icon },
+    { type: 'file', label: 'File', icon: Icon, component: Icon },
   ],
 };
 
@@ -105,7 +105,7 @@ describe('workspace tab controller', () => {
     assert.equal(controller.isActiveWorkspace('acme'), false);
     assert.equal(controller.openItemById('app'), false);
     assert.equal(controller.closeItemById('utils'), false);
-    assert.equal(controller.showDetails(), false);
+    assert.equal(controller.showPrimary(), false);
     assert.equal(calls.length, 0);
     // Tabs in acme were not mutated either
     assert.deepEqual(useWorkbench.getState().tabs['acme'], ['file:utils']);

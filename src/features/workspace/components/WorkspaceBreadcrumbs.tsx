@@ -1,12 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // Breadcrumbs for /workspaces/$wsId, plugged in via the route's
 // staticData.Breadcrumbs:   Acme ▾ › Storefront Core › checkout.ts
-// Clicking a parent folder crumb calls `@/features/explorer/contract`
-// (`revealItems`) rather than reaching into Explorer internals.
 // ─────────────────────────────────────────────────────────────
 import { Fragment, type ReactNode } from 'react';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
-import { parseItem, type Item } from '@/lib/plugin-system';
+import { parseItem, useRegistry, type Item } from '@/lib/plugin-system';
 import { CrumbButton, CrumbSep, CrumbText } from '@/components/ui/Breadcrumb';
 import { useExplorerContract } from '@/features/explorer/contract';
 import { pathTo, type Workspace, type WorkspaceSummary } from '../api/workspaces';
@@ -19,7 +17,11 @@ export function WorkspaceBreadcrumbs(): ReactNode {
   const workspace: Workspace = detailRoute.useLoaderData();
   const list: WorkspaceSummary[] = workspacesRoute.useLoaderData();
   const item: string | undefined = detailRoute.useSearch({ select: (s: { item?: string }) => s.item });
+  const registry = useRegistry();
   const navigate = useNavigate();
+
+  const primaryItem = workspace.items.find((i) => i.type === 'primary' && i.parentId === null);
+  const primaryLabel = primaryItem?.name ?? registry.itemRenderer.get('primary')?.label ?? 'Primary';
 
   const ref = parseItem(item);
   const chain: Item[] = ref ? pathTo(workspace.items, ref.id) : [];
@@ -49,7 +51,7 @@ export function WorkspaceBreadcrumbs(): ReactNode {
       {chain.length === 0 ? (
         <>
           <CrumbSep />
-          <CrumbText>Details</CrumbText>
+          <CrumbText>{primaryLabel}</CrumbText>
         </>
       ) : (
         chain.map((it, i) => (

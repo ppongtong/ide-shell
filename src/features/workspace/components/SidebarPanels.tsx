@@ -12,17 +12,15 @@ import { useWorkbench } from '../stores/workbench';
 interface Props {
   container: string;
   panels: readonly string[];
-  allowOptional?: boolean;
 }
 
-export function SidebarPanels({ container, panels, allowOptional = true }: Props) {
+export function SidebarPanels({ container, panels }: Props) {
   const registry = useRegistry();
   const navigate = useNavigate();
   const sizes = useWorkbench((s) => s.panelSizes);
   const setSizes = useWorkbench((s) => s.setPanelSizes);
 
   const close = (panelId: string) => {
-    if (!allowOptional) return;
     void navigate({
       to: '.',
       search: (prev) => ({ ...prev, panels: togglePanel(prev.panels, panelId) }),
@@ -35,7 +33,7 @@ export function SidebarPanels({ container, panels, allowOptional = true }: Props
     return {
       id: p.id,
       title: p.title,
-      visible: !!p.alwaysOn || (allowOptional && panels.includes(p.id)),
+      visible: !!p.alwaysOn || panels.includes(p.id),
       header: (
         <>
           <span>{p.title}</span>

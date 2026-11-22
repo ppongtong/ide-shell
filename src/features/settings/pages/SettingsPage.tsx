@@ -29,16 +29,18 @@ export function SettingsPage() {
               <th scope="col">Plugin</th>
               <th scope="col">Activities</th>
               <th scope="col">Panels</th>
-              <th scope="col">Item types</th>
+              <th scope="col">Item renderers</th>
             </tr>
           </thead>
           <tbody>
             {registry.plugins.map((p) => (
               <tr key={p.id}>
-                <td><code>{p.id}</code></td>
+                <td>
+                  <code>{p.id}</code>
+                </td>
                 <td>{p.activities?.map((a) => `${a.id} (${a.action.kind})`).join(', ') || '—'}</td>
                 <td>{p.panels?.map((x) => x.id).join(', ') || '—'}</td>
-                <td>{p.itemTypes?.map((t) => t.type).join(', ') || '—'}</td>
+                <td>{p.itemRenderers?.map((r) => r.type).join(', ') || '—'}</td>
               </tr>
             ))}
           </tbody>

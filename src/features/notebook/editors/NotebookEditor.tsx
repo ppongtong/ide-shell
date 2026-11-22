@@ -1,10 +1,7 @@
 // Custom renderer registered for `item.type === 'notebook'` by `example.notebook`.
-//   • Cells carry explicit `id` and `kind: 'markdown' | 'code'` so keys/run-counts stay
-//     tied to cell identity and `#` comments in code cells are never misread as markdown.
-//   • Kept mounted inside `<Activity>` by `EditorHost`, so simulated run counts survive tab switches.
 import { useState } from 'react';
 import { Play } from 'lucide-react';
-import type { EditorProps } from '@/lib/plugin-system';
+import type { ItemRendererProps } from '@/lib/plugin-system';
 
 interface NotebookCell {
   readonly id: string;
@@ -32,14 +29,14 @@ function parseCells(raw: string | undefined): NotebookCell[] {
   return [{ id: 'cell-1', kind: 'code', source: raw }];
 }
 
-export default function NotebookEditor({ workspace, item }: EditorProps) {
-  const cells = parseCells(item.content);
+export default function NotebookEditor({ workspace, item }: ItemRendererProps) {
+  const cells = parseCells(item?.content);
   const [runs, setRuns] = useState<Record<string, number>>({});
 
   return (
     <div className="notebook">
       <header className="notebook-head">
-        <strong>{item.name}</strong>
+        <strong>{item?.name ?? 'Notebook'}</strong>
         <span className="hint">{`${workspace.name} · ${cells.length} cells`}</span>
       </header>
 

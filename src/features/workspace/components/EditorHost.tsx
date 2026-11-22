@@ -1,58 +1,68 @@
 // ─────────────────────────────────────────────────────────────
-// Pinned Details tab + every OPEN item tab stay mounted inside
-// <Activity>; only the active one is visible. Keyed by workspace
-// so switching workspaces never leaks state across colliding IDs.
+// Pinned Primary tab + every OPEN item tab stay mounted inside
+// <Activity>; only the active one is visible. Both render through
+// `registry.itemRenderer.get(type)?.component` — EditorHost never
+// knows what any plugin renders inside its tab.
 // ─────────────────────────────────────────────────────────────
 import { Activity, Suspense } from 'react';
-import { parseItem, useRegistry, type WorkspaceInfo } from '@/lib/plugin-system';
-import type { Workspace } from '../api/workspaces';
+import { parseItem, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
 import { indexItems } from '../lib/search';
-import { WorkspaceDetailsTab } from './WorkspaceDetailsTab';
 
 interface Props {
-  workspace: Workspace | null;
+  workspace: WorkspaceInfo;
+  primaryItem: Item | undefined;
   openKeys: readonly string[];
   activeKey?: string;
 }
 
-export function EditorHost({ workspace, openKeys, activeKey }: Props) {
-  const wsKey = workspace?.id ?? '__new__';
+export function EditorHost({ workspace, primaryItem, openKeys, activeKey }: Props) {
   // If the URL holds an unopenable/unknown `?item=`, still render its inline error view cleanly.
-  const keys = workspace && activeKey && !openKeys.includes(activeKey) ? [...openKeys, activeKey] : openKeys;
+  const keys = activeKey && !openKeys.includes(activeKey) ? [...openKeys, activeKey] : openKeys;
 
   return (
     <div className="editors">
-      <Activity key={`${wsKey}:__details__`} mode={!activeKey ? 'visible' : 'hidden'}>
+      <Activity key={`${workspace.id}:__primary__`} mode={!activeKey ? 'visible' : 'hidden'}>
         <div
-          id={`panel-${wsKey}-__details__`}
+          id={`panel-${workspace.id}-__primary__`}
           className="editor"
           role="tabpanel"
           tabIndex={0}
-          aria-labelledby={`tab-${wsKey}-__details__`}
+          aria-labelledby={`tab-${workspace.id}-__primary__`}
         >
-          <WorkspaceDetailsTab workspace={workspace} />
+          <PrimarySlot workspace={workspace} item={primaryItem} />
         </div>
       </Activity>
 
-      {workspace &&
-        keys.map((key) => (
-          <Activity key={`${workspace.id}:${key}`} mode={key === activeKey ? 'visible' : 'hidden'}>
-            <div
-              id={`panel-${workspace.id}-${key}`}
-              className="editor"
-              role="tabpanel"
-              tabIndex={0}
-              aria-labelledby={`tab-${workspace.id}-${key}`}
-            >
-              <EditorFor workspace={workspace} itemKey={key} />
-            </div>
-          </Activity>
-        ))}
+      {keys.map((key) => (
+        <Activity key={`${workspace.id}:${key}`} mode={key === activeKey ? 'visible' : 'hidden'}>
+          <div
+            id={`panel-${workspace.id}-${key}`}
+            className="editor"
+            role="tabpanel"
+            tabIndex={0}
+            aria-labelledby={`tab-${workspace.id}-${key}`}
+          >
+            <ItemSlot workspace={workspace} itemKey={key} />
+          </div>
+        </Activity>
+      ))}
     </div>
   );
 }
 
-function EditorFor({ workspace, itemKey }: { workspace: WorkspaceInfo; itemKey: string }) {
+function PrimarySlot({ workspace, item }: { workspace: WorkspaceInfo; item: Item | undefined }) {
+  const Component = useRegistry().itemRenderer.get('primary')?.component;
+  if (!Component) {
+    return <div className="empty">No renderer registered for type “primary”.</div>;
+  }
+  return (
+    <Suspense fallback={<div className="empty">Loading…</div>}>
+      <Component workspace={workspace} item={item} />
+    </Suspense>
+  );
+}
+
+function ItemSlot({ workspace, itemKey }: { workspace: WorkspaceInfo; itemKey: string }) {
   const registry = useRegistry();
   const ref = parseItem(itemKey);
   if (!ref) return <div className="empty">Invalid item key “{itemKey}”.</div>;
@@ -60,12 +70,12 @@ function EditorFor({ workspace, itemKey }: { workspace: WorkspaceInfo; itemKey: 
   const item = indexItems(workspace).byKey.get(itemKey);
   if (!item) return <div className="empty">“{itemKey}” is not in this workspace.</div>;
 
-  const Editor = registry.itemType.get(item.type)?.editor;
-  if (!Editor) return <div className="empty">No editor registered for type “{item.type}”.</div>;
+  const Component = registry.itemRenderer.get(item.type)?.component;
+  if (!Component) return <div className="empty">No renderer registered for type “{item.type}”.</div>;
 
   return (
-    <Suspense fallback={<div className="empty">Loading editor…</div>}>
-      <Editor workspace={workspace} item={item} />
+    <Suspense fallback={<div className="empty">Loading…</div>}>
+      <Component workspace={workspace} item={item} />
     </Suspense>
   );
 }

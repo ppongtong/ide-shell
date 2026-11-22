@@ -82,6 +82,7 @@ a.crumb:hover, button.crumb:hover { color: var(--text); background: var(--hover)
 .tree-row:hover { background: var(--hover); }
 .tree-row.active { background: var(--active-row); }
 .tree-row.primary-root { font-weight: 600; color: #fff; }
+.tree-row.primary-root.unset { font-weight: 500; font-style: italic; color: var(--muted); }
 .tree-row.type-group { color: var(--muted); font-weight: 500; margin-top: 2px; }
 .tree-count { margin-left: auto; font-size: 11px; color: var(--muted); }
 .tree-empty { margin: 2px 0 6px; padding-left: 34px; font-size: 12px; color: var(--muted); }
@@ -193,6 +194,21 @@ a.crumb:hover, button.crumb:hover { color: var(--text); background: var(--hover)
 .preview-root { display: flex; align-items: center; gap: 6px; color: var(--text); }
 .preview-children { list-style: none; margin: 0; padding: 0 0 0 20px; color: var(--muted); }
 .preview-children li { padding: 2px 0; }
+.pk-options { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.pk-legend { padding: 0; margin-bottom: 6px; font-weight: 600; color: var(--text); }
+.pk-card {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--side); cursor: pointer;
+}
+.pk-card:hover { border-color: var(--muted); }
+.pk-card.selected { border-color: var(--accent); background: #1c2833; }
+.pk-card input { margin-top: 3px; }
+.pk-card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pk-card-body p { margin: 0; }
+.pk-card-title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pk-card-title code { font-size: 11px; color: var(--muted); background: var(--bar); padding: 1px 6px; border-radius: 4px; }
+.pk-source { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.pk-linked-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .save-ok { margin-right: auto; font-size: 12px; color: #89d185; }
 
 /* ── Sidebar stack (ResizableStack) ──────────── */

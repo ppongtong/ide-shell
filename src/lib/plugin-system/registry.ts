@@ -3,7 +3,7 @@
 // sorted lists + lookup maps the rest of the app reads.
 // ─────────────────────────────────────────────────────────────
 import { createContext, use } from 'react';
-import { EMPTY, type Activity, type ItemType, type Plugin, type RouteAction, type SidebarPanel } from './types';
+import { EMPTY, type Activity, type ItemRenderer, type Plugin, type RouteAction, type SidebarPanel } from './types';
 
 export interface Registry {
   readonly plugins: readonly Plugin[];
@@ -11,7 +11,7 @@ export interface Registry {
   readonly bottomActivities: readonly Activity[];
   readonly activity: ReadonlyMap<string, Activity>;
   readonly panel: ReadonlyMap<string, SidebarPanel>;
-  readonly itemType: ReadonlyMap<string, ItemType>;
+  readonly itemRenderer: ReadonlyMap<string, ItemRenderer>;
   /** Panels a container can show, in stack order. */
   panelsFor(container: SidebarPanel['container']): readonly SidebarPanel[];
   /** Most specific route activity matching `path` (longest `action.to` prefix wins). */
@@ -51,11 +51,11 @@ function assertUniqueOrder<T extends { readonly id: string; readonly order: numb
 export function createRegistry(plugins: readonly Plugin[]): Registry {
   const activities = plugins.flatMap((p) => p.activities ?? []);
   const panels = plugins.flatMap((p) => p.panels ?? []);
-  const itemTypes = plugins.flatMap((p) => p.itemTypes ?? []);
+  const itemRenderers = plugins.flatMap((p) => p.itemRenderers ?? []);
 
   const activity = indexById('activity', activities, (a) => a.id);
   const panel = indexById('panel', panels, (p) => p.id);
-  const itemType = indexById('item type', itemTypes, (t) => t.type);
+  const itemRenderer = indexById('item renderer', itemRenderers, (r) => r.type);
 
   // Fail at boot, not at first click.
   assertUniqueOrder('activity', activities, (a) => a.position ?? 'top');
@@ -81,7 +81,7 @@ export function createRegistry(plugins: readonly Plugin[]): Registry {
   }
   for (const bucket of panelsByContainer.values()) bucket.sort(byOrder);
 
-  // Longest `action.to` first so `/workspaces/new` beats `/workspaces`.
+  // Longest `action.to` first so nested routes beat parent area homes.
   const routeActivities = activities
     .filter((a): a is Activity & { readonly action: RouteAction } => a.action.kind === 'route')
     .sort((a, b) => b.action.to.length - a.action.to.length);
@@ -92,7 +92,7 @@ export function createRegistry(plugins: readonly Plugin[]): Registry {
     bottomActivities: activities.filter((a) => a.position === 'bottom').sort(byOrder),
     activity,
     panel,
-    itemType,
+    itemRenderer,
     panelsFor: (container) => panelsByContainer.get(container) ?? EMPTY,
     activeRouteActivity: (path) => routeActivities.find((a) => inArea(path, a.action.to)),
   };

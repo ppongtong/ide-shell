@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import type { EditorProps } from '@/lib/plugin-system';
+import type { ItemRendererProps } from '@/lib/plugin-system';
 
-export default function FileEditor({ item }: EditorProps) {
-  const baseContent = item.content ?? '';
+export default function FileEditor({ item }: ItemRendererProps) {
+  const baseContent = item?.content ?? '';
   // `draft === null` means clean (reflects latest `item.content` if refreshed from backend);
   // a string holds unsaved local edits preserved while hidden inside `<Activity>`.
   const [draft, setDraft] = useState<string | null>(null);
@@ -19,7 +19,7 @@ export default function FileEditor({ item }: EditorProps) {
           const next = e.target.value;
           setDraft(next === baseContent ? null : next);
         }}
-        aria-label={item.name}
+        aria-label={item?.name ?? 'File'}
       />
       {dirty && <p className="status">Unsaved changes (kept while you switch tabs)</p>}
     </div>

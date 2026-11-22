@@ -17,7 +17,7 @@ import {
   type FormEvent,
 } from 'react';
 import { Send } from 'lucide-react';
-import { EMPTY, useRegistry, type ItemType } from '@/lib/plugin-system';
+import { EMPTY, useRegistry, type ItemRenderer } from '@/lib/plugin-system';
 import { useWorkspaceContract, type WorkspaceSnapshot } from '@/features/workspace/contract';
 import { agentApi, runAgentAction } from '../api/agent';
 
@@ -31,7 +31,7 @@ interface Msg {
 async function askAndApply(
   text: string,
   asked: WorkspaceSnapshot | null,
-  itemTypes: ReadonlyMap<string, ItemType>,
+  renderers: ReadonlyMap<string, ItemRenderer>,
 ): Promise<string> {
   let reply;
   try {
@@ -48,7 +48,7 @@ async function askAndApply(
       return `${answer} Skipped: you left that workspace.`;
     }
     for (const action of reply.actions) {
-      const note = runAgentAction(action, askedWs, itemTypes);
+      const note = runAgentAction(action, askedWs, renderers);
       if (note) answer += ` (${note})`;
     }
   }
@@ -87,7 +87,7 @@ export default function AgentPanel() {
 
     startSending(async () => {
       addOptimistic({ ws: targetWs, msg: { ...mine, pending: true } });
-      const answer = await askAndApply(text, asked, registry.itemType);
+      const answer = await askAndApply(text, asked, registry.itemRenderer);
       startTransition(() => {
         setHistory((prev) => ({
           ...prev,
