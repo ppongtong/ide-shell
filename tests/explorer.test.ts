@@ -8,16 +8,16 @@ import { resetAllPersisted } from '../src/stores/persist.ts';
 const Icon = () => null;
 
 const itemTypes = new Map<string, ItemType>([
-  ['primary', { type: 'primary', label: 'Primary', icon: Icon, isContainer: true }],
+  ['root-bundle', { type: 'root-bundle', label: 'Bundle', icon: Icon, isContainer: true, pinnedRoot: true }],
   ['folder', { type: 'folder', label: 'Folder', icon: Icon, isContainer: true }],
   ['file', { type: 'file', label: 'File', pluralLabel: 'Files', icon: Icon }],
   ['dataset', { type: 'dataset', label: 'Dataset', pluralLabel: 'Datasets', icon: Icon }],
 ]);
 
 describe('explorer tree & store', () => {
-  it('pins primary roots with nested children and groups remaining leaf items by type', () => {
+  it('pins pinnedRoot item types with nested children and groups remaining leaf items by type', () => {
     const items: Item[] = [
-      { id: 'primary-1', type: 'primary', name: 'Core', parentId: null },
+      { id: 'primary-1', type: 'root-bundle', name: 'Core', parentId: null },
       { id: 'child-b', type: 'file', name: 'b.ts', parentId: 'primary-1' },
       { id: 'child-a', type: 'file', name: 'a.ts', parentId: 'primary-1' },
       { id: 'z-file', type: 'file', name: 'zeta.ts', parentId: null },

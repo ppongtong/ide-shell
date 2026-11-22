@@ -1,7 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRegistry } from '../src/lib/plugin-system/registry.ts';
-import type { Activity, Plugin, SidebarPanel } from '../src/lib/plugin-system/types.ts';
+import { createRegistry, type Activity, type Plugin, type SidebarPanel } from '@/lib/plugin-system';
+import { workspacePlugin } from '../src/features/workspace/plugin.ts';
+import { agentPlugin } from '../src/features/agent/plugin.ts';
+import { reportsPlugin } from '../src/features/reports/plugin.ts';
+import { settingsPlugin } from '../src/features/settings/plugin.ts';
+import { useShell } from '../src/stores/shell-store.ts';
 
 const Icon = () => null;
 const View = () => null;
@@ -144,5 +148,20 @@ describe('createRegistry', () => {
         ]),
       /must use to: "\/reports"/,
     );
+  });
+
+  it('validates built-in plugins including route, togglePanel, and dialog activities + shell dialog state', () => {
+    const explorerStub: Plugin = {
+      id: 'core.explorer',
+      panels: [{ id: 'explorer', title: 'Explorer', container: 'workspace.detail', order: 10, alwaysOn: true, component: View }],
+    };
+    const reg = createRegistry([workspacePlugin, explorerStub, agentPlugin, reportsPlugin, settingsPlugin]);
+    const shortcuts = reg.activity.get('shortcuts');
+    assert.equal(shortcuts?.action.kind, 'dialog');
+
+    useShell.getState().showDialog('shortcuts');
+    assert.equal(useShell.getState().openDialog, 'shortcuts');
+    useShell.getState().hideDialog();
+    assert.equal(useShell.getState().openDialog, null);
   });
 });

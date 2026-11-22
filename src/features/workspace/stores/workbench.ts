@@ -1,10 +1,12 @@
 // ─────────────────────────────────────────────────────────────
 // "What's open" in workspaces — state that does NOT belong in the URL.
 // Persisted, so tabs and sidebar split ratios come back after a refresh.
-// Explorer folder/group expansion lives in features/explorer.
+// All actions guard `get()` BEFORE calling `set()` so Zustand `persist`
+// never serializes/writes to `localStorage` on no-op calls.
 // ─────────────────────────────────────────────────────────────
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { EMPTY } from '@/lib/plugin-system';
 import { persistName, persistStorage, registerResetter } from '@/stores/persist';
 
 interface WorkbenchData {
@@ -22,6 +24,8 @@ interface WorkbenchState extends WorkbenchData {
   /** Removes the tab; updates `lastActive[ws]` if it was active, and returns the fallback neighbour (or null). */
   closeTab(ws: string, key: string): string | null;
   setLastActive(ws: string, key: string | undefined): void;
+  /** Removes any persisted tab keys whose items no longer exist in `validKeys`. */
+  pruneTabs(ws: string, validKeys: ReadonlySet<string>): void;
   setPanelSizes(sizes: Record<string, number>): void;
 }
 
@@ -36,22 +40,23 @@ export const useWorkbench = create<WorkbenchState>()(
     (set, get) => ({
       ...initialData,
 
-      openTab: (ws, key) =>
-        set((s) => {
-          const list = s.tabs[ws] ?? [];
-          const hasTab = list.includes(key);
-          const sameActive = s.lastActive[ws] === key;
-          if (hasTab && sameActive) return s;
-          return {
-            tabs: hasTab ? s.tabs : { ...s.tabs, [ws]: [...list, key] },
-            lastActive: sameActive ? s.lastActive : { ...s.lastActive, [ws]: key },
-          };
-        }),
+      openTab: (ws, key) => {
+        const cur = get();
+        const list = cur.tabs[ws] ?? EMPTY;
+        const hasTab = list.includes(key);
+        const sameActive = cur.lastActive[ws] === key;
+        if (hasTab && sameActive) return;
+        set((s) => ({
+          tabs: hasTab ? s.tabs : { ...s.tabs, [ws]: [...list, key] },
+          lastActive: sameActive ? s.lastActive : { ...s.lastActive, [ws]: key },
+        }));
+      },
 
       closeTab: (ws, key) => {
         const cur = get();
-        const list = cur.tabs[ws] ?? [];
+        const list = cur.tabs[ws] ?? EMPTY;
         const i = list.indexOf(key);
+        if (i === -1) return cur.lastActive[ws] ?? null;
         const rest = list.filter((k) => k !== key);
         const fallback = rest[i] ?? rest[i - 1] ?? null; // right neighbour, else left, else Details tab
         set((s) => {
@@ -68,14 +73,37 @@ export const useWorkbench = create<WorkbenchState>()(
         return fallback;
       },
 
-      setLastActive: (ws, key) =>
+      setLastActive: (ws, key) => {
+        if (get().lastActive[ws] === key) return;
         set((s) => {
-          if (s.lastActive[ws] === key) return s;
           const next = { ...s.lastActive };
           if (key) next[ws] = key;
           else delete next[ws];
           return { lastActive: next };
-        }),
+        });
+      },
+
+      pruneTabs: (ws, validKeys) => {
+        const cur = get();
+        const list = cur.tabs[ws];
+        const active = cur.lastActive[ws];
+        const nextList = list ? list.filter((k) => validKeys.has(k)) : undefined;
+        const listChanged = !!list && nextList!.length !== list.length;
+        const activeInvalid = active !== undefined && !validKeys.has(active);
+        if (!listChanged && !activeInvalid) return;
+        set((s) => {
+          const nextActive = { ...s.lastActive };
+          if (activeInvalid) {
+            const fallback = nextList?.at(-1);
+            if (fallback) nextActive[ws] = fallback;
+            else delete nextActive[ws];
+          }
+          return {
+            tabs: listChanged ? { ...s.tabs, [ws]: nextList! } : s.tabs,
+            lastActive: activeInvalid ? nextActive : s.lastActive,
+          };
+        });
+      },
 
       setPanelSizes: (sizes) => set((s) => ({ panelSizes: { ...s.panelSizes, ...sizes } })),
     }),
@@ -89,6 +117,3 @@ export const useWorkbench = create<WorkbenchState>()(
 );
 
 registerResetter(() => useWorkbench.setState(initialData));
-
-/** Zustand selectors must return a stable value; a new [] every render loops forever. */
-export const NONE: readonly string[] = Object.freeze([]);

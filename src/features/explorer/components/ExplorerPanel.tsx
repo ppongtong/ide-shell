@@ -1,19 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 // Explorer (`core.explorer`):
 //   • Reads the active workspace & active tab from `@/features/workspace/contract`
-//     (subscribing only to `workspace`, `isDraft`, and `activeKey` — never `openItems`,
-//     so closing background tabs never re-renders the tree).
+//     (subscribing only to `workspace`, `isDraft`, `activeKey`, and `activeItem`).
+//   • Auto-reveals `activeItem`'s parent containers on tab switches and deep links,
+//     so workspace tab logic never needs to call Explorer.
 //   • Publishes its own shared state & actions to `./contract` (`useExplorerContract`)
-//     so Breadcrumbs, Workspace, and Agent can reveal/collapse Explorer nodes
-//     without importing Explorer internals.
+//     via `useLayoutEffect` as the reference plugin state-sharing example.
 // ─────────────────────────────────────────────────────────────
-import { useEffect } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, File } from 'lucide-react';
-import { itemKey, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
+import { EMPTY, itemKey, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
 import { useWorkspaceContract } from '@/features/workspace/contract';
 import { useExplorerContract } from '../contract';
-import { buildExplorerTree, NONE_ITEMS } from '../lib/tree';
-import { NONE_IDS, useExplorerStore } from '../stores/explorer-store';
+import { ancestorContainerIds, buildExplorerTree } from '../lib/tree';
+import { useExplorerStore } from '../stores/explorer-store';
 
 export default function ExplorerPanel() {
   const workspace = useWorkspaceContract((s) => s.current?.workspace ?? null);
@@ -42,7 +42,8 @@ export default function ExplorerPanel() {
 
 function SavedExplorer({ workspace }: { workspace: WorkspaceInfo }) {
   const activeKey = useWorkspaceContract((s) => s.current?.activeKey);
-  const collapsed = useExplorerStore((s) => s.collapsed[workspace.id] ?? NONE_IDS);
+  const activeItem = useWorkspaceContract((s) => s.current?.activeItem);
+  const collapsed = useExplorerStore((s) => s.collapsed[workspace.id] ?? EMPTY);
   const toggleNode = useExplorerStore((s) => s.toggleNode);
   const revealItems = useExplorerStore((s) => s.revealItems);
   const collapseAllInStore = useExplorerStore((s) => s.collapseAll);
@@ -55,42 +56,51 @@ function SavedExplorer({ workspace }: { workspace: WorkspaceInfo }) {
   const registry = useRegistry();
   const tree = buildExplorerTree(workspace.items, registry.itemType);
 
-  useEffect(() => {
+  const targetRef = useRef({ wsId: workspace.id, collapsibleIds: tree.collapsibleIds });
+  useLayoutEffect(() => {
+    targetRef.current = { wsId: workspace.id, collapsibleIds: tree.collapsibleIds };
+  }, [workspace.id, tree.collapsibleIds]);
+
+  // Auto-reveal ancestor folders/group whenever the active tab changes (including deep links & Agent opens).
+  useLayoutEffect(() => {
+    if (!activeItem) return;
+    const toReveal = ancestorContainerIds(tree.byId, tree.primaryRoots, activeItem);
+    revealItems(workspace.id, toReveal);
+  }, [workspace.id, activeItem, tree.byId, tree.primaryRoots, revealItems]);
+
+  useLayoutEffect(() => {
     setSnapshot({ workspaceId: workspace.id, collapsedIds: collapsed });
   }, [workspace.id, collapsed, setSnapshot]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setActions({
-      toggleNode,
       revealItems,
       collapseAll() {
-        collapseAllInStore(workspace.id, tree.collapsibleIds);
+        const { wsId, collapsibleIds } = targetRef.current;
+        collapseAllInStore(wsId, collapsibleIds);
         return true;
       },
       expandAll() {
-        expandWorkspace(workspace.id);
+        expandWorkspace(targetRef.current.wsId);
         return true;
       },
     });
-  }, [workspace.id, tree.collapsibleIds, toggleNode, revealItems, collapseAllInStore, expandWorkspace, setActions]);
-
-  useEffect(() => {
     return () => {
       clear();
     };
-  }, [clear]);
+  }, [revealItems, collapseAllInStore, expandWorkspace, setActions, clear]);
 
   const renderNode = (item: Item, depth: number, extraClass = '') => {
     const type = registry.itemType.get(item.type);
     const Icon = type?.icon ?? File;
-    const isPrimary = item.type === 'primary';
+    const isPinned = !!type?.pinnedRoot;
     const open = !collapsed.includes(item.id);
-    const active = isPrimary ? !activeKey : itemKey(item.type, item.id) === activeKey;
-    const children = tree.byParent.get(item.id) ?? NONE_ITEMS;
+    const active = isPinned ? !activeKey : itemKey(item.type, item.id) === activeKey;
+    const children = tree.byParent.get(item.id) ?? EMPTY;
 
     return (
       <li key={item.id}>
-        {isPrimary ? (
+        {isPinned ? (
           <div
             className={`tree-row ${extraClass} ${active ? 'active' : ''}`}
             style={{ paddingLeft: 8 + depth * 14 }}
@@ -152,7 +162,7 @@ function SavedExplorer({ workspace }: { workspace: WorkspaceInfo }) {
       {tree.leafTypes.map((type) => {
         const groupId = `group:${type.type}`;
         const open = !collapsed.includes(groupId);
-        const items = tree.byItemType.get(type.type) ?? NONE_ITEMS;
+        const items = tree.byItemType.get(type.type) ?? EMPTY;
         const Icon = type.icon;
         const heading = type.pluralLabel ?? `${type.label}s`;
 

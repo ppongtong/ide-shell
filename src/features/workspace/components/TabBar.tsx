@@ -1,16 +1,22 @@
 import { useRef, type KeyboardEvent } from 'react';
 import { SlidersHorizontal, X } from 'lucide-react';
 import { parseItem, useRegistry, type WorkspaceInfo } from '@/lib/plugin-system';
+import { indexItems } from '../lib/search';
 import { useTabActions } from '../hooks/useTabs';
-import { NONE, useWorkbench } from '../stores/workbench';
 
-export function TabBar({ workspace, activeKey }: { workspace: WorkspaceInfo | null; activeKey?: string }) {
+interface Props {
+  workspace: WorkspaceInfo | null;
+  openKeys: readonly string[];
+  activeKey?: string;
+}
+
+export function TabBar({ workspace, openKeys, activeKey }: Props) {
   const registry = useRegistry();
   const wsId = workspace?.id ?? '__new__';
-  const openKeys = useWorkbench((s) => (workspace ? (s.tabs[workspace.id] ?? NONE) : NONE));
   const actions = useTabActions(workspace);
   const listRef = useRef<HTMLDivElement>(null);
 
+  const byKey = workspace ? indexItems(workspace).byKey : undefined;
   const totalTabs = 1 + openKeys.length; // index 0 = pinned Details tab
 
   function onTabKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -22,10 +28,10 @@ export function TabBar({ workspace, activeKey }: { workspace: WorkspaceInfo | nu
     if (next === -1) return;
     e.preventDefault();
     if (next === 0) {
-      actions?.showDetails();
+      actions.showDetails();
     } else {
       const nextKey = openKeys[next - 1];
-      if (nextKey) actions?.activateKey(nextKey);
+      if (nextKey) actions.activateKey(nextKey);
     }
     listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
   }
@@ -45,7 +51,7 @@ export function TabBar({ workspace, activeKey }: { workspace: WorkspaceInfo | nu
           aria-selected={detailsActive}
           aria-controls={`panel-${wsId}-__details__`}
           onClick={() => {
-            actions?.showDetails();
+            actions.showDetails();
           }}
           onKeyDown={(e) => onTabKeyDown(e, 0)}
         >
@@ -58,7 +64,7 @@ export function TabBar({ workspace, activeKey }: { workspace: WorkspaceInfo | nu
         openKeys.map((key, i) => {
           const ref = parseItem(key);
           if (!ref) return null;
-          const item = workspace.items.find((it) => it.id === ref.id && it.type === ref.type);
+          const item = byKey?.get(key);
           const Icon = registry.itemType.get(ref.type)?.icon;
           const active = key === activeKey;
           const name = item?.name ?? key;
@@ -73,7 +79,9 @@ export function TabBar({ workspace, activeKey }: { workspace: WorkspaceInfo | nu
                 tabIndex={active ? 0 : -1}
                 aria-selected={active}
                 aria-controls={`panel-${workspace.id}-${key}`}
-                onClick={() => actions?.activateKey(key)}
+                onClick={() => {
+                  actions.activateKey(key);
+                }}
                 onKeyDown={(e) => onTabKeyDown(e, i + 1)}
               >
                 {Icon && <Icon size={14} />}
@@ -83,7 +91,9 @@ export function TabBar({ workspace, activeKey }: { workspace: WorkspaceInfo | nu
                 type="button"
                 className="icon-btn"
                 aria-label={`Close ${name}`}
-                onClick={() => actions?.closeKey(key)}
+                onClick={() => {
+                  actions.closeKey(key);
+                }}
               >
                 <X size={13} />
               </button>

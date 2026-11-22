@@ -32,7 +32,7 @@ src/
     index.tsx             redirect → /workspaces
     workspaces/route.tsx  layout + workspace list loader, crumb "Workspaces"
     workspaces/index.tsx  list
-    workspaces/new.tsx    draft creation workbench (staticData.view = 'workspace.new')
+    workspaces/new.tsx    draft creation workbench (pinned Details tab)
     workspaces/$wsId.tsx  staticData.container = 'workspace.detail', ?item & ?panels
     settings.tsx
     $activityId/$.tsx     catch-all for plugin pages (/reports, /reports/q1)
@@ -42,7 +42,7 @@ src/
     explorer/             in-house: Explorer tree panel + explorer contract (reference example)
     agent/                Agent button + Agent panel (consumes workspace + explorer contracts)
     reports/              example plugin page with its own sub-views
-    settings/             Settings button + page
+    settings/             Settings button + page + Keyboard shortcuts dialog
   lib/plugin-system/      the IDE plugin SDK: types, createPluginBridge, registry, ShellLocation
   stores/                 shell-wide state & persistence helpers (shell-store, persist)
   components/ui/          reusable UI: ActivityBarButton, Breadcrumb, Modal, ResizableStack
@@ -67,10 +67,10 @@ Every plugin lives in `src/features/<name>/` with two explicit public doors:
 
 ### How plugins read Shell state & share Feature state
 
-- **Shell state (`useShellLocation`, `useRegistry`):** Routes declare `staticData.container` (e.g. `'workspace.detail'`) and `staticData.view` instead of hardcoding route strings in `lib/plugin-system`. `ActivityBar` toggles `?panels=` generically on the active container route (`to: '.'`).
+- **Shell state (`useShellLocation`, `useRegistry`):** Routes declare `staticData.container` (e.g. `'workspace.detail'`) instead of hardcoding route strings in `lib/plugin-system`. `ActivityBar` toggles `?panels=` generically on the active container route (`to: '.'`).
 - **Feature-to-feature state (`createPluginBridge`):**
-  - `features/workspace/contract.ts` publishes `{ workspace, isDraft, activeKey, activeItem, openItems }` and `{ showDetails, openItem, closeItem }`.
-  - `features/explorer/contract.ts` (our reference plugin example) consumes `workspace/contract` to render the tree **and** publishes `{ workspaceId, collapsedIds }` + `{ toggleNode, revealItems, collapseAll, expandAll }`—used by `WorkspaceBreadcrumbs`, `workspace` tab opening, and `AgentPanel` (`"collapse all"` / `"expand all"`).
+  - `features/workspace/contract.ts` publishes `{ workspace, isDraft, activeKey, activeItem, openItems }` and `{ showDetails, openItem, closeItem }` via `useLayoutEffect`.
+  - `features/explorer/contract.ts` (our reference plugin example) consumes `workspace/contract` to render the tree (auto-revealing `activeItem` ancestors on tab switches and deep links) **and** publishes `{ workspaceId, collapsedIds }` + `{ revealItems, collapseAll, expandAll }`—used by `WorkspaceBreadcrumbs` and `AgentPanel` (`"collapse all"` / `"expand all"`).
 
 ## React 19.x features used
 

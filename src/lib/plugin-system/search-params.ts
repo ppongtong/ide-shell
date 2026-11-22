@@ -1,11 +1,4 @@
-// URL search params of the workspace-details container.
-//   ?item=file:utils      → the active tab ("type:id")
-//   &panels=agent         → extra sidebar panels switched on (comma list)
-
-export interface DetailSearch {
-  readonly item?: string;
-  readonly panels?: string;
-}
+// Generic item-key ("type:id") and ?panels= URL search param helpers.
 
 export const itemKey = (type: string, id: string) => `${type}:${id}`;
 
@@ -14,12 +7,6 @@ export function parseItem(key?: string): { readonly type: string; readonly id: s
   const i = key.indexOf(':');
   if (i <= 0 || i === key.length - 1) return undefined;
   return { type: key.slice(0, i), id: key.slice(i + 1) };
-}
-
-export function validateDetailSearch(raw: Record<string, unknown>): DetailSearch {
-  const item = typeof raw.item === 'string' && parseItem(raw.item) ? raw.item : undefined;
-  const panels = typeof raw.panels === 'string' && raw.panels ? raw.panels : undefined;
-  return { item, panels };
 }
 
 export const parsePanels = (s?: string): string[] => (s ? s.split(',').filter(Boolean) : []);

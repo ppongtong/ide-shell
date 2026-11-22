@@ -11,13 +11,11 @@ export interface ExplorerSnapshot {
 }
 
 export interface ExplorerActions {
-  /** Toggle a container item or `group:<type>` section open/closed. */
-  toggleNode(wsId: string, nodeId: string): void;
-  /** Ensure every ID in `nodeIds` is expanded (used by Breadcrumbs & Agent when revealing an item). */
+  /** Ensure every ID in `nodeIds` is expanded (used by Breadcrumbs when clicking a parent folder). */
   revealItems(wsId: string, nodeIds: readonly string[]): void;
-  /** Collapse all collapsible roots/groups in `wsId` (or the currently active Explorer workspace). */
+  /** Collapse all collapsible roots/groups in the active Explorer workspace. */
   collapseAll(): boolean;
-  /** Expand all collapsed nodes in the currently active Explorer workspace. */
+  /** Expand all collapsed nodes in the active Explorer workspace. */
   expandAll(): boolean;
 }
 

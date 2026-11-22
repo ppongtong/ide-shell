@@ -1,14 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  itemKey,
-  parseItem,
-  parsePanels,
-  togglePanel,
-  validateDetailSearch,
-} from '../src/lib/plugin-system/search-params.ts';
+import { itemKey, parseItem, parsePanels, togglePanel } from '@/lib/plugin-system';
+import { indexItems, validateDetailSearch } from '../src/features/workspace/lib/search.ts';
 
-describe('search-params', () => {
+describe('search-params & workspace search helpers', () => {
   it('parses valid type:id item keys and rejects malformed keys', () => {
     assert.deepEqual(parseItem(itemKey('file', 'utils')), { type: 'file', id: 'utils' });
     assert.deepEqual(parseItem('file:dir:nested'), { type: 'file', id: 'dir:nested' });
@@ -19,7 +14,7 @@ describe('search-params', () => {
     assert.equal(parseItem('file:'), undefined);
   });
 
-  it('validates detail search params cleanly', () => {
+  it('validates workspace detail search params cleanly', () => {
     assert.deepEqual(validateDetailSearch({ item: 'file:utils', panels: 'agent' }), {
       item: 'file:utils',
       panels: 'agent',
@@ -41,5 +36,18 @@ describe('search-params', () => {
     assert.equal(togglePanel('agent', 'agent'), undefined);
     assert.equal(togglePanel('agent', 'outline'), 'agent,outline');
     assert.equal(togglePanel('agent,outline', 'agent'), 'outline');
+  });
+
+  it('caches item lookup maps per workspace items array reference', () => {
+    const ws = {
+      id: 'acme',
+      name: 'Acme',
+      items: [{ id: 'utils', type: 'file', name: 'utils.ts', parentId: null }],
+    };
+    const first = indexItems(ws);
+    const second = indexItems(ws);
+    assert.equal(first, second);
+    assert.equal(first.byId.get('utils')?.name, 'utils.ts');
+    assert.equal(first.byKey.get('file:utils')?.name, 'utils.ts');
   });
 });

@@ -32,4 +32,31 @@ describe('workbench & shell persistence reset', () => {
     resetAllPersisted();
     assert.deepEqual(useShell.getState().lastHref, {});
   });
+
+  it('skips redundant persist storage writes when openTab or setLastActive is a no-op', () => {
+    resetAllPersisted();
+    let writes = 0;
+    const origStorage = useWorkbench.persist.getOptions().storage;
+    useWorkbench.persist.setOptions({
+      storage: {
+        getItem: () => null,
+        setItem: () => {
+          writes += 1;
+        },
+        removeItem: () => {},
+      },
+    });
+
+    try {
+      useWorkbench.getState().openTab('acme', 'file:utils');
+      assert.equal(writes, 1);
+
+      // Calling openTab or setLastActive again with the exact same active tab must not write to storage
+      useWorkbench.getState().openTab('acme', 'file:utils');
+      useWorkbench.getState().setLastActive('acme', 'file:utils');
+      assert.equal(writes, 1);
+    } finally {
+      useWorkbench.persist.setOptions({ storage: origStorage });
+    }
+  });
 });

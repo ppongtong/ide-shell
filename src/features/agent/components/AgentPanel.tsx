@@ -3,8 +3,8 @@
 //   • Selects narrow primitive slices (`wsId`, `wsName`, `activeName`) from
 //     `@/features/workspace/contract`, so opening/closing background tabs
 //     never triggers a re-render.
-//   • Executes reply actions through `@/features/workspace/contract` and
-//     `@/features/explorer/contract` using `.getState()` before & after `await`.
+//   • Layers `useOptimistic` over the per-workspace `history` map (keyed by `ws`)
+//     so switching workspaces mid-reply never shows a pending prompt in the wrong chat.
 // ─────────────────────────────────────────────────────────────
 import {
   startTransition,
@@ -17,6 +17,7 @@ import {
   type FormEvent,
 } from 'react';
 import { Send } from 'lucide-react';
+import { EMPTY } from '@/lib/plugin-system';
 import { useWorkspaceContract, type WorkspaceSnapshot } from '@/features/workspace/contract';
 import { useExplorerContract } from '@/features/explorer/contract';
 import { agentApi, type AgentAction } from '../api/agent';
@@ -27,8 +28,6 @@ interface Msg {
   text: string;
   pending?: boolean;
 }
-
-const EMPTY_MSGS: readonly Msg[] = Object.freeze([]);
 
 function runReplyAction(action: AgentAction): boolean {
   if (action.target === 'explorer') {
@@ -56,7 +55,7 @@ async function askAndApply(text: string, asked: WorkspaceSnapshot | null): Promi
       answer += ' Skipped: you left that workspace.';
     } else {
       for (const action of reply.actions) {
-        if (!runReplyAction(action)) answer += ` (${action.type} did nothing.)`;
+        if (!runReplyAction(action)) answer += ' (Skipped: you left that workspace or nothing changed.)';
       }
     }
   }
@@ -69,9 +68,15 @@ export default function AgentPanel() {
   const activeName = useWorkspaceContract((s) => s.current?.activeItem?.name);
   const wsKey = wsId ?? '_none';
 
-  const [history, setHistory] = useState<Record<string, Msg[]>>({});
-  const messages = history[wsKey] ?? EMPTY_MSGS;
-  const [shown, addOptimistic] = useOptimistic(messages, (cur, m: Msg) => [...cur, m]);
+  const [history, setHistory] = useState<Record<string, readonly Msg[]>>({});
+  const [optimisticHistory, addOptimistic] = useOptimistic(
+    history,
+    (cur, entry: { ws: string; msg: Msg }) => ({
+      ...cur,
+      [entry.ws]: [...(cur[entry.ws] ?? EMPTY), entry.msg],
+    }),
+  );
+  const shown = optimisticHistory[wsKey] ?? EMPTY;
   const [isPending, startSending] = useTransition();
   const end = useRef<HTMLDivElement>(null);
 
@@ -87,12 +92,12 @@ export default function AgentPanel() {
     const mine: Msg = { id: crypto.randomUUID(), from: 'you', text };
 
     startSending(async () => {
-      addOptimistic({ ...mine, pending: true });
+      addOptimistic({ ws: targetWs, msg: { ...mine, pending: true } });
       const answer = await askAndApply(text, asked);
       startTransition(() => {
         setHistory((prev) => ({
           ...prev,
-          [targetWs]: [...(prev[targetWs] ?? []), mine, { id: crypto.randomUUID(), from: 'agent', text: answer }],
+          [targetWs]: [...(prev[targetWs] ?? EMPTY), mine, { id: crypto.randomUUID(), from: 'agent', text: answer }],
         }));
       });
     });

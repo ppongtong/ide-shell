@@ -135,6 +135,13 @@ a.crumb:hover, button.crumb:hover { color: var(--text); background: var(--hover)
 }
 .modal::backdrop { background: rgb(0 0 0 / 0.5); }
 .modal-body { padding: 20px; }
+.shortcuts-list { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.shortcut-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.shortcut-row dd { margin: 0; color: var(--muted); text-align: right; }
+.shortcut-row kbd {
+  padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--bar);
+  font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap;
+}
 .form { display: flex; flex-direction: column; gap: 14px; }
 .form h2 { margin: 0; font-size: 16px; }
 .form .field { display: flex; flex-direction: column; gap: 6px; }

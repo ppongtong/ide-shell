@@ -4,6 +4,9 @@
 // ─────────────────────────────────────────────────────────────
 import type { ComponentType, LazyExoticComponent } from 'react';
 
+/** Shared frozen empty array sentinel for Zustand selectors and default lists. */
+export const EMPTY: readonly never[] = Object.freeze([]);
+
 export type Icon = ComponentType<{ size?: number | string }>;
 export type Lazy<P = Record<string, never>> = LazyExoticComponent<ComponentType<P>> | ComponentType<P>;
 
@@ -12,8 +15,6 @@ export interface ShellLocation {
   readonly path: string;
   /** Container ID declared by the active route's staticData (e.g. 'workspace.detail'). */
   readonly container?: string;
-  /** Optional view tag declared by the active route's staticData (e.g. 'workspace.new'). */
-  readonly view?: string;
   /** Extra sidebar panels switched on via ?panels=, e.g. ['agent']. Always-on panels are not listed. */
   readonly panels: readonly string[];
 }
@@ -110,6 +111,8 @@ export interface ItemType {
   readonly icon: Icon;
   /** Containers expand/collapse instead of opening a tab. */
   readonly isContainer?: boolean;
+  /** Pin root items of this type at the top of the Explorer (with clicking label opening Details). */
+  readonly pinnedRoot?: boolean;
   /** Rendered inside the tab. Omit for containers. */
   readonly editor?: Lazy<EditorProps>;
 }

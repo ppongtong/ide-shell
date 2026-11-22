@@ -6,19 +6,19 @@
 import { Activity, Suspense } from 'react';
 import { parseItem, useRegistry, type WorkspaceInfo } from '@/lib/plugin-system';
 import type { Workspace } from '../api/workspaces';
-import { NONE, useWorkbench } from '../stores/workbench';
+import { indexItems } from '../lib/search';
 import { WorkspaceDetailsTab } from './WorkspaceDetailsTab';
 
 interface Props {
   workspace: Workspace | null;
+  openKeys: readonly string[];
   activeKey?: string;
 }
 
-export function EditorHost({ workspace, activeKey }: Props) {
+export function EditorHost({ workspace, openKeys, activeKey }: Props) {
   const wsKey = workspace?.id ?? '__new__';
-  const open = useWorkbench((s) => (workspace ? (s.tabs[workspace.id] ?? NONE) : NONE));
-  // Render a newly visited deep-link item immediately on the first pass before syncTabs commits.
-  const keys = workspace && activeKey && !open.includes(activeKey) ? [...open, activeKey] : open;
+  // If the URL holds an unopenable/unknown `?item=`, still render its inline error view cleanly.
+  const keys = workspace && activeKey && !openKeys.includes(activeKey) ? [...openKeys, activeKey] : openKeys;
 
   return (
     <div className="editors">
@@ -57,7 +57,7 @@ function EditorFor({ workspace, itemKey }: { workspace: WorkspaceInfo; itemKey: 
   const ref = parseItem(itemKey);
   if (!ref) return <div className="empty">Invalid item key “{itemKey}”.</div>;
 
-  const item = workspace.items.find((i) => i.id === ref.id && i.type === ref.type);
+  const item = indexItems(workspace).byKey.get(itemKey);
   if (!item) return <div className="empty">“{itemKey}” is not in this workspace.</div>;
 
   const Editor = registry.itemType.get(item.type)?.editor;

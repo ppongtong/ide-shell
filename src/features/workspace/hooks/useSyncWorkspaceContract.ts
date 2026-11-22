@@ -1,16 +1,16 @@
 // ─────────────────────────────────────────────────────────────
 // Publishes the active workspace (or draft state on `/workspaces/new`)
-// and tab actions to `@/features/workspace/contract` so Explorer,
-// Agent, and any future plugin can consume them cleanly.
+// and tab actions to `@/features/workspace/contract`.
+//   • Uses `useLayoutEffect` so Explorer/Agent never lag the screen by 1 frame.
+//   • Registers `actions` once per mount, reading the latest workspace via ref.
 // ─────────────────────────────────────────────────────────────
-import { useEffect } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { useRouter } from '@tanstack/react-router';
-import { itemKey, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
+import { EMPTY, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
 import { useWorkspaceContract } from '../contract';
+import { indexItems } from '../lib/search';
 import { createTabController } from './useTabs';
-import { NONE, useWorkbench } from '../stores/workbench';
-
-const NO_ITEMS: readonly Item[] = Object.freeze([]);
+import { useWorkbench } from '../stores/workbench';
 
 export function useSyncWorkspaceContract(
   workspace: WorkspaceInfo | null,
@@ -19,18 +19,23 @@ export function useSyncWorkspaceContract(
 ) {
   const registry = useRegistry();
   const router = useRouter();
-  const openKeys = useWorkbench((s) => (workspace ? (s.tabs[workspace.id] ?? NONE) : NONE));
+  const openKeys = useWorkbench((s) => (workspace ? (s.tabs[workspace.id] ?? EMPTY) : EMPTY));
   const setSnapshot = useWorkspaceContract((s) => s.setSnapshot);
   const setActions = useWorkspaceContract((s) => s.setActions);
   const clear = useWorkspaceContract((s) => s.clear);
 
-  useEffect(() => {
+  const workspaceRef = useRef<WorkspaceInfo | null>(workspace);
+  useLayoutEffect(() => {
+    workspaceRef.current = workspace;
+  }, [workspace]);
+
+  useLayoutEffect(() => {
     if (!workspace) {
-      setSnapshot({ workspace: null, isDraft: true, openItems: NO_ITEMS });
+      setSnapshot({ workspace: null, isDraft: true, openItems: EMPTY });
       return;
     }
-    const byKey = new Map(workspace.items.map((i) => [itemKey(i.type, i.id), i]));
-    const openItems = openKeys.flatMap((k) => byKey.get(k) ?? []);
+    const { byKey } = indexItems(workspace);
+    const openItems = openKeys.flatMap((k) => byKey.get(k) ?? EMPTY);
     setSnapshot({
       workspace,
       isDraft: false,
@@ -40,26 +45,15 @@ export function useSyncWorkspaceContract(
     });
   }, [workspace, activeKey, activeItem, openKeys, setSnapshot]);
 
-  useEffect(() => {
-    if (!workspace) {
-      setActions({
-        showDetails: () => false,
-        openItem: () => false,
-        closeItem: () => false,
-      });
-      return;
-    }
-    const controller = createTabController(workspace, registry, router);
+  useLayoutEffect(() => {
+    const controller = createTabController(() => workspaceRef.current, registry, router);
     setActions({
-      showDetails: () => controller.showDetails(),
-      openItem: (itemId) => controller.openItemById(itemId),
-      closeItem: (itemId) => controller.closeItemById(itemId),
+      showDetails: controller.showDetails,
+      openItem: controller.openItemById,
+      closeItem: controller.closeItemById,
     });
-  }, [workspace, registry, router, setActions]);
-
-  useEffect(() => {
     return () => {
       clear();
     };
-  }, [clear]);
+  }, [registry, router, setActions, clear]);
 }

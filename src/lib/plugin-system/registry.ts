@@ -3,7 +3,7 @@
 // sorted lists + lookup maps the rest of the app reads.
 // ─────────────────────────────────────────────────────────────
 import { createContext, use } from 'react';
-import type { Activity, ItemType, Plugin, RouteAction, SidebarPanel } from './types';
+import { EMPTY, type Activity, type ItemType, type Plugin, type RouteAction, type SidebarPanel } from './types';
 
 export interface Registry {
   readonly plugins: readonly Plugin[];
@@ -17,8 +17,6 @@ export interface Registry {
   /** Most specific route activity matching `path` (longest `action.to` prefix wins). */
   activeRouteActivity(path: string): Activity | undefined;
 }
-
-const EMPTY_PANELS: readonly SidebarPanel[] = Object.freeze([]);
 
 /** Is `path` inside the area whose home is `to`? '/workspaces/acme' is inside '/workspaces'. */
 export const inArea = (path: string, to: string) => path === to || path.startsWith(to + '/');
@@ -95,7 +93,7 @@ export function createRegistry(plugins: readonly Plugin[]): Registry {
     activity,
     panel,
     itemType,
-    panelsFor: (container) => panelsByContainer.get(container) ?? EMPTY_PANELS,
+    panelsFor: (container) => panelsByContainer.get(container) ?? EMPTY,
     activeRouteActivity: (path) => routeActivities.find((a) => inArea(path, a.action.to)),
   };
 }

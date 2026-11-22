@@ -41,13 +41,13 @@ IDE Shell is a VS Code–style web app shell built with **React 19.3**, **TanSta
 |      |     sales.csv           |                                             |
 |      +======== divider ========+  (drag with pointer or resize with arrows)  |
 |      | AGENT               [x] |                                             |
-|      | Context: Acme > ...     |                                             |
-|      | [chat messages]         |                                             |
-| [+]  | [Ask about checkout.ts] |                                             |
-| [*]  +-------------------------+---------------------------------------------+
+| [+]  | Context: Acme > ...     |                                             |
+| [?]  | [chat messages]         |                                             |
+| [*]  | [Ask about checkout.ts] |                                             |
++------+-------------------------+---------------------------------------------+
 ```
 
-- **Activity Bar** (`48px`, left): Top group holds area/panel buttons (`Workspaces`, `Agent`, `Reports`). Bottom group holds utility buttons (`New workspace`, `Settings`).
+- **Activity Bar** (`48px`, left): Top group holds area/panel buttons (`Workspaces`, `Agent`, `Reports`). Bottom group holds utility buttons (`New workspace`, `Keyboard shortcuts` dialog, `Settings`).
 - **Breadcrumbs** (`30px`, top): Built from the active nested routes. Inside a workspace, shows a workspace `<select>` switcher plus clickable parent nodes (or `Details` when the pinned Details tab is active).
 - **Sidebar** (`260px` desktop / `44vw` phone): Stacked panels managed by `ResizableStack`. `Explorer` is always visible; optional panels like `Agent` appear when listed in `?panels=`.
 - **TabBar + EditorHost** (right): The **Details** tab is always pinned at index `0` with no close button. User-opened files and datasets appear as closable tabs to its right.
@@ -64,7 +64,7 @@ flowchart TD
     Root --> ActivityBar["ActivityBar"]
     Root --> Breadcrumbs["Breadcrumbs"]
     Root --> Outlet["main -> Outlet (active route)"]
-    Root --> DialogHost["DialogHost -> Modal (native dialog)"]
+    Root --> DialogHost["DialogHost -> Modal -> ShortcutsDialog"]
 
     ActivityBar --> ActivityBtn["ActivityBarButton (x N)"]
 
@@ -145,7 +145,7 @@ flowchart TD
     Root --> CatchAll["$activityId/$.tsx: /$activityId/$ (PluginPageHost)"]
 
     WsLayout --> WsIndex["workspaces/index.tsx: /workspaces/ (WorkspaceListPage)"]
-    WsLayout --> WsNew["workspaces/new.tsx: /workspaces/new (view: workspace.new, crumb: New workspace)"]
+    WsLayout --> WsNew["workspaces/new.tsx: /workspaces/new (crumb: New workspace)"]
     WsLayout --> WsDetail["workspaces/$wsId.tsx: /workspaces/$wsId (container: workspace.detail, loader: get)"]
 ```
 
@@ -161,8 +161,8 @@ Example URL inside a workspace:
 ```
 
 - **Omitted `?item=` means the pinned Details tab is active.** There is no `?item=details` noise in the URL.
-- **Validation (`validateDetailSearch` in `src/lib/plugin-system/search-params.ts`):** Rejects malformed keys (missing `:`, empty type, or empty id such as `"abc"`, `":id"`, `"file:"`).
-- **Route-agnostic container metadata (`staticData.container`):** `/workspaces/$wsId` declares `staticData: { container: 'workspace.detail' }`. `useShellLocation()` reads `container`, `view`, `pathname`, and `?panels=` in a single structurally-shared subscription, and `ActivityBar` toggles `?panels=` generically via `navigate({ to: '.' })`.
+- **Validation (`validateDetailSearch` in `src/features/workspace/lib/search.ts`):** Rejects malformed keys (missing `:`, empty type, or empty id such as `"abc"`, `":id"`, `"file:"`).
+- **Route-agnostic container metadata (`staticData.container`):** `/workspaces/$wsId` declares `staticData: { container: 'workspace.detail' }`. `useShellLocation()` reads `container`, `pathname`, and `?panels=` in a single structurally-shared subscription, and `ActivityBar` toggles `?panels=` generically via `navigate({ to: '.' })`.
 - **Panel retention:** `/workspaces/$wsId` applies `retainSearchParams(['panels'])`, so switching workspaces or opening tabs keeps `?panels=agent` open automatically.
 - **Browser history policy (`push` vs `replace`):**
   - **Push** (adds a Back step): Switching areas, switching workspaces, opening a **new** item tab for the first time.
@@ -225,8 +225,8 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | URL & search params | `routes/workspaces/$wsId.tsx` | In browser URL | `route.useSearch()`, `useShellLocation()` | Shareable links, browser Back/Forward, refresh safe |
 | Route loaders | `routes/workspaces/route.tsx`, `$wsId.tsx` | In-memory router cache | `route.useLoaderData()` | Server data; `router.invalidate()` refreshes all readers at once |
-| `useWorkbench` | `features/workspace/stores/workbench.ts` | Yes (`ide:workspace`, `version: 3`) | Selector with frozen `NONE` fallback, or `.getState()` in handlers | Open tab strips & panel ratios survive refresh |
-| `useExplorerStore` | `features/explorer/stores/explorer-store.ts` | Yes (`ide:explorer`, `version: 1`) | Selector with frozen `NONE_IDS` fallback | Explorer collapsed folders/groups survive refresh |
+| `useWorkbench` | `features/workspace/stores/workbench.ts` | Yes (`ide:workspace`, `version: 3`) | Selector with frozen `EMPTY` fallback, or `.getState()` in handlers | Open tab strips & panel ratios survive refresh |
+| `useExplorerStore` | `features/explorer/stores/explorer-store.ts` | Yes (`ide:explorer`, `version: 1`) | Selector with frozen `EMPTY` fallback | Explorer collapsed folders/groups survive refresh |
 | `useShell` | `stores/shell-store.ts` | No (cleared on Reset) | Selector (`openDialog`) or `.getState()` (`lastHref`) | Back button should not reopen modals; session-only memory |
 | `useWorkspaceContract` | `features/workspace/contract.ts` | No | Narrow primitive selectors in render; `.getState()` in handlers | Lets `explorer`, `agent`, and future plugins read/act on workspaces |
 | `useExplorerContract` | `features/explorer/contract.ts` | No | Selector or `.getState()` in handlers | Reference example: lets `workspace` breadcrumbs & `agent` reveal/collapse Explorer nodes |
@@ -235,6 +235,7 @@ flowchart LR
 ### 5.2 Important Persistence & Performance Boundaries
 
 - **What survives switching tabs inside the same workspace:** Unsaved `FileEditor` text, `WorkspaceDetailsTab` edits, and `AgentPanel` chat all survive because `EditorHost` and `ResizableStack` keep hidden children mounted inside React `<Activity>`.
+- **Synchronous contract sync (`useLayoutEffect`) & no-op persistence guards:** `useSyncWorkspaceContract` and `ExplorerPanel` publish snapshots via `useLayoutEffect` (zero 1-frame lag), and `useWorkbench` / `useExplorerStore` check `get()` before calling `set()` so Zustand `persist` never writes unchanged state to `localStorage`.
 - **Zero shell/panel re-render cascades on tab switch:** `useShellLocation` omits `?item=`, `Shell` records `lastHref` via `router.subscribe('onResolved')`, `ActivityBar` reads `lastHref` via `.getState()` on click, `ExplorerPanel` caches `buildExplorerTree` strictly on `(items, itemTypes)`, and `AgentPanel` selects primitive fields (`wsId`, `wsName`, `activeName`).
 - **Zero React renders during 120 Hz sidebar resize:** `ResizableStack` updates `flexGrow` and `aria-valuenow` directly via DOM refs on `pointermove` and commits once on `pointerup`.
 - **In-memory reset (`src/stores/persist.ts`):** `workbench.ts`, `explorer-store.ts`, and `shell-store.ts` register reset callbacks via `registerResetter(...)`. Clicking reset in Settings runs `resetAllPersisted()`, clearing tabs, panel sizes, collapsed folders, `lastHref`, and `ide:*` keys in `localStorage` without `location.reload()`.
@@ -319,17 +320,17 @@ sequenceDiagram
     Page->>WsC: setActions({ showDetails, openItem, closeItem })
     WsC-->>Exp: Renders Explorer tree
     Exp->>ExpC: setSnapshot({ workspaceId, collapsedIds })
-    Exp->>ExpC: setActions({ toggleNode, revealItems, collapseAll, expandAll })
+    Exp->>ExpC: setActions({ revealItems, collapseAll, expandAll })
     WsC-->>Agent: Narrow selectors update "Context: Acme > checkout.ts"
 
     Agent->>WsC: getState().current (before await)
     Agent->>API: ask("open checkout.ts", askedSnapshot)
     API-->>Agent: Reply with workspace action openItem
     Agent->>WsC: Re-verify workspace.id (after await)
-    alt Still in same workspace
+    alt Still in same workspace and no pending navigation away
       Agent->>WsC: actions.openItem("primary-storefront-checkout")
-      WsC->>ExpC: actions.revealItems("acme", ["primary-storefront"])
       WsC->>Page: openTab + router.navigate
+      WsC-->>Exp: activeItem changed -> Explorer auto-reveals parent container
     else User switched workspaces while waiting
       Agent->>Agent: Append "Skipped: you left that workspace."
     end
@@ -524,7 +525,7 @@ sequenceDiagram
 | --- | --- | --- |
 | Reset layout | `/settings` -> `Close all tabs and reset panel sizes` | Calls `resetAllPersisted()` (resets `useWorkbench`, `useExplorerStore`, and `useShell.lastHref` in-memory + clears `ide:*` in `localStorage` without `location.reload()`, keeping in-memory created workspaces). |
 | Browse plugin sub-views | `/reports` -> click `Q1 revenue` -> `/reports/q1` | Handled by catch-all `/$activityId/$` -> `PluginPageHost` -> lazy `ReportsPage` (`subPath="q1"`), updating document `<title>` |
-| Open/dismiss modal dialog | Any plugin activity with `action: { kind: 'dialog', dialog: lazy(...) }` | `DialogHost` opens native `<dialog closedby="any">` via `showModal()`; `Esc`, Cancel, and backdrop click all route through `onClose` -> `hideDialog`; Safari fallback checks pointerdown + bounding box so text-selection drags don't dismiss the modal |
+| Open/dismiss modal dialog | Activity Bar `[?]` (`Keyboard shortcuts` -> `ShortcutsDialog`) or any `kind: 'dialog'` plugin | `DialogHost` opens native `<dialog closedby="any">` via `showModal()`; `Esc`, `Done`, and backdrop click all route through `onClose` -> `hideDialog`; Safari fallback checks pointerdown + bounding box so text-selection drags don't dismiss the modal |
 
 ---
 
@@ -550,5 +551,5 @@ Every change is checked locally and on push to `main` via `.github/workflows/dep
 
 1. `npm run typecheck` (`tsc --noEmit`) — strict TypeScript 6 + `noUncheckedIndexedAccess`.
 2. `npm run lint` (`eslint .`) — TypeScript rules, React Hooks / React Compiler rules, and folder + plugin-contract boundaries.
-3. `npm test` (`node --import ./tests/setup-aliases.mts --test 'tests/**/*.test.ts'`) — Node 24 unit tests for `createRegistry`, `createPluginBridge`, `explorer`, `workbench`, `agentApi`, `search-params`, and `workspacesApi`.
+3. `npm test` (`node --import ./tests/setup-aliases.mts --test 'tests/**/*.test.ts'`) — Node 24 unit tests for `createRegistry`, `createPluginBridge`, `tabs`, `explorer`, `workbench`, `agentApi`, `search-params`, and `workspacesApi`.
 4. `npm run build` / `npm run build:demo` — production Vite build (failing on any React Compiler `CompileError`) and single-file `#/` hash-routed demo build deployed to GitHub Pages.

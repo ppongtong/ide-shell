@@ -1,6 +1,8 @@
 // Persisted folder/group collapse state owned privately by `core.explorer`.
+// Guards `get()` before `set()` so Zustand `persist` skips no-op storage writes.
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { EMPTY } from '@/lib/plugin-system';
 import { persistName, persistStorage, registerResetter } from '@/stores/persist';
 
 interface ExplorerData {
@@ -21,38 +23,40 @@ const initialData: ExplorerData = {
 
 export const useExplorerStore = create<ExplorerState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...initialData,
 
       toggleNode: (ws, id) =>
         set((s) => {
-          const list = s.collapsed[ws] ?? [];
+          const list = s.collapsed[ws] ?? EMPTY;
           const next = list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
           return { collapsed: { ...s.collapsed, [ws]: next } };
         }),
 
-      revealItems: (ws, ids) =>
-        set((s) => {
-          const list = s.collapsed[ws];
-          if (!list?.length || !ids.length) return s;
-          const toExpand = new Set(ids);
-          const next = list.filter((id) => !toExpand.has(id));
-          return next.length === list.length ? s : { collapsed: { ...s.collapsed, [ws]: next } };
-        }),
+      revealItems: (ws, ids) => {
+        const list = get().collapsed[ws];
+        if (!list?.length || !ids.length) return;
+        const toExpand = new Set(ids);
+        const next = list.filter((id) => !toExpand.has(id));
+        if (next.length === list.length) return;
+        set((s) => ({ collapsed: { ...s.collapsed, [ws]: next } }));
+      },
 
-      collapseAll: (ws, allCollapsibleIds) =>
-        set((s) => {
-          const unique = [...new Set(allCollapsibleIds)];
-          return { collapsed: { ...s.collapsed, [ws]: unique } };
-        }),
+      collapseAll: (ws, allCollapsibleIds) => {
+        const unique = [...new Set(allCollapsibleIds)];
+        const cur = get().collapsed[ws] ?? EMPTY;
+        if (cur.length === unique.length && unique.every((id, i) => cur[i] === id)) return;
+        set((s) => ({ collapsed: { ...s.collapsed, [ws]: unique } }));
+      },
 
-      expandWorkspace: (ws) =>
+      expandWorkspace: (ws) => {
+        if (!get().collapsed[ws]?.length) return;
         set((s) => {
-          if (!s.collapsed[ws]?.length) return s;
           const next = { ...s.collapsed };
           delete next[ws];
           return { collapsed: next };
-        }),
+        });
+      },
     }),
     {
       name: persistName('explorer'),
@@ -64,5 +68,3 @@ export const useExplorerStore = create<ExplorerState>()(
 );
 
 registerResetter(() => useExplorerStore.setState(initialData));
-
-export const NONE_IDS: readonly string[] = Object.freeze([]);

@@ -21,14 +21,14 @@ export const workspacePlugin = definePlugin({
       id: 'new-workspace',
       title: 'New workspace',
       icon: FolderPlus,
-      order: 90,
+      order: 80,
       position: 'bottom',
       action: { kind: 'route', to: '/workspaces/new' },
     },
   ],
 
   itemTypes: [
-    { type: 'primary', label: 'Primary', icon: KeyRound, isContainer: true },
+    { type: 'primary', label: 'Primary', icon: KeyRound, isContainer: true, pinnedRoot: true },
     { type: 'folder', label: 'Folder', icon: Folder, isContainer: true },
     {
       type: 'file',
