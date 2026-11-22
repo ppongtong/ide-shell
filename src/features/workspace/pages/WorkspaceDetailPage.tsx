@@ -4,7 +4,8 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useEffectEvent } from 'react';
 import { getRouteApi } from '@tanstack/react-router';
-import { parseItem, parsePanels, useRegistry } from '@/lib/plugin-system';
+import { parsePanels, useRegistry } from '@/lib/plugin-system';
+import { getItemTypes, parseItem } from '@/contracts/workspace';
 import { useWorkbench } from '../stores/workbench';
 import { useSyncWorkspaceBridge } from '../hooks/useSyncWorkspaceBridge';
 import { SidebarPanels } from '../components/SidebarPanels';
@@ -16,13 +17,13 @@ const route = getRouteApi('/workspaces/$wsId');
 export function WorkspaceDetailPage() {
   const workspace = route.useLoaderData();
   const { item, panels } = route.useSearch();
-  const registry = useRegistry();
+  const itemTypes = getItemTypes(useRegistry());
   const openTab = useWorkbench((s) => s.openTab);
   const setLastActive = useWorkbench((s) => s.setLastActive);
 
   const ref = parseItem(item);
   const matchedItem = ref ? workspace.items.find((i) => i.id === ref.id && i.type === ref.type) : undefined;
-  const isOpenable = !!matchedItem && !registry.itemType.get(matchedItem.type)?.isContainer;
+  const isOpenable = !!matchedItem && !itemTypes.get(matchedItem.type)?.isContainer;
   const activeItem = isOpenable ? matchedItem : undefined;
 
   // URL → store: a shared link or refresh lands on an item that may not be open yet.

@@ -5,11 +5,12 @@
 //   close a tab         → remove; if it was active, navigate to its neighbour
 // ─────────────────────────────────────────────────────────────
 import { useNavigate } from '@tanstack/react-router';
-import { itemKey, useRegistry, type Item } from '@/lib/plugin-system';
+import { useRegistry } from '@/lib/plugin-system';
+import { getItemTypes, itemKey, type Item } from '@/contracts/workspace';
 import { NONE, useWorkbench } from '../stores/workbench';
 
 export function useTabs(wsId: string, activeKey: string | undefined) {
-  const registry = useRegistry();
+  const itemTypes = getItemTypes(useRegistry());
   const navigate = useNavigate();
   const open = useWorkbench((s) => s.tabs[wsId] ?? NONE);
 
@@ -27,7 +28,7 @@ export function useTabs(wsId: string, activeKey: string | undefined) {
     /** Explorer click: containers expand, everything else opens in a tab. */
     openItem(item: Item) {
       const state = useWorkbench.getState();
-      if (registry.itemType.get(item.type)?.isContainer) return state.toggleFolder(wsId, item.id);
+      if (itemTypes.get(item.type)?.isContainer) return state.toggleFolder(wsId, item.id);
       const key = itemKey(item.type, item.id);
       if (key === activeKey) return;
       const currentOpen = state.tabs[wsId] ?? NONE;

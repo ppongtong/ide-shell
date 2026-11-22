@@ -5,6 +5,7 @@
 import { lazy } from 'react';
 import { Sparkles } from 'lucide-react';
 import { definePlugin } from '@/lib/plugin-system';
+import { WORKSPACE_DETAIL_CONTAINER } from '@/contracts/workspace';
 
 export const agentPlugin = definePlugin({
   id: 'core.agent',
@@ -15,7 +16,7 @@ export const agentPlugin = definePlugin({
       title: 'Agent',
       icon: Sparkles,
       order: 20,
-      enabledWhen: (loc) => loc.view === 'workspace.detail',
+      enabledWhen: (loc) => loc.routeId === WORKSPACE_DETAIL_CONTAINER,
       disabledReason: 'open a workspace first',
       action: { kind: 'togglePanel', panelId: 'agent' },
     },
@@ -25,7 +26,7 @@ export const agentPlugin = definePlugin({
     {
       id: 'agent',
       title: 'Agent',
-      container: 'workspace.detail',
+      container: WORKSPACE_DETAIL_CONTAINER,
       order: 20, // below the Explorer
       component: lazy(() => import('./components/AgentPanel')),
     },

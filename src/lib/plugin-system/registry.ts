@@ -3,7 +3,7 @@
 // sorted lists + lookup maps the rest of the app reads.
 // ─────────────────────────────────────────────────────────────
 import { createContext, use } from 'react';
-import type { Activity, ItemType, Plugin, SidebarPanel } from './types';
+import type { Activity, Plugin, SidebarPanel } from './types';
 
 export interface Registry {
   plugins: Plugin[];
@@ -11,12 +11,11 @@ export interface Registry {
   bottomActivities: Activity[];
   activity: Map<string, Activity>;
   panel: Map<string, SidebarPanel>;
-  itemType: Map<string, ItemType>;
   /** Panels a container can show, in stack order. */
-  panelsFor(container: SidebarPanel['container']): SidebarPanel[];
+  panelsFor(container: string): SidebarPanel[];
 }
 
-function indexById<T>(kind: string, list: T[], key: (t: T) => string): Map<string, T> {
+export function indexById<T>(kind: string, list: T[], key: (t: T) => string): Map<string, T> {
   const map = new Map<string, T>();
   for (const t of list) {
     const k = key(t);
@@ -46,11 +45,9 @@ function assertUniqueOrder<T extends { id: string; order: number }>(
 export function createRegistry(plugins: Plugin[]): Registry {
   const activities = plugins.flatMap((p) => p.activities ?? []);
   const panels = plugins.flatMap((p) => p.panels ?? []);
-  const itemTypes = plugins.flatMap((p) => p.itemTypes ?? []);
 
   const activity = indexById('activity', activities, (a) => a.id);
   const panel = indexById('panel', panels, (p) => p.id);
-  const itemType = indexById('item type', itemTypes, (t) => t.type);
 
   // Fail at boot, not at first click.
   assertUniqueOrder('activity', activities, (a) => a.position ?? 'top');
@@ -72,7 +69,6 @@ export function createRegistry(plugins: Plugin[]): Registry {
     bottomActivities: activities.filter((a) => a.position === 'bottom').sort(byOrder),
     activity,
     panel,
-    itemType,
     panelsFor: (container) => panels.filter((p) => p.container === container).sort(byOrder),
   };
 }

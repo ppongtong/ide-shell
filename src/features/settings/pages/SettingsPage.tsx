@@ -1,5 +1,6 @@
 // Settings also shows what the registry loaded — handy while building plugins.
 import { useRegistry } from '@/lib/plugin-system';
+import '@/contracts/workspace';
 import { resetAllPersisted } from '@/stores/persist';
 
 export function SettingsPage() {

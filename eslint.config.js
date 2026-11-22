@@ -26,15 +26,29 @@ export default defineConfig([
   },
 
   // ── Folder rules ───────────────────────────────────────────
-  // lib/ is the plugin SDK: it depends on nothing above it.
+  // lib/ is the generic plugin SDK: it depends on nothing above it.
   {
     files: ['src/lib/**'],
-    rules: forbid(['app', 'routes', 'features', 'stores', 'components'], 'lib/ must not depend on app code.'),
+    rules: forbid(
+      ['app', 'routes', 'features', 'stores', 'contracts', 'components'],
+      'lib/ must stay generic and not depend on app or domain code.',
+    ),
   },
-  // components/ is reusable UI: no plugins, routes, stores or features.
+  // contracts/ defines shared domain types & helpers (e.g. workspace) on top of lib/.
+  {
+    files: ['src/contracts/**'],
+    rules: forbid(
+      ['app', 'routes', 'features', 'stores', 'components'],
+      'contracts/ may only depend on lib/.',
+    ),
+  },
+  // components/ is reusable UI: no plugins, routes, stores, contracts or features.
   {
     files: ['src/components/**'],
-    rules: forbid(['app', 'routes', 'features', 'stores', 'lib'], 'components/ must stay app-agnostic.'),
+    rules: forbid(
+      ['app', 'routes', 'features', 'stores', 'contracts', 'lib'],
+      'components/ must stay app-agnostic.',
+    ),
   },
   // stores/ holds app-wide state and cross-feature bridges only.
   {
@@ -46,13 +60,16 @@ export default defineConfig([
     files: ['src/features/**'],
     rules: forbid(
       ['app', 'routes', 'features'],
-      'Features talk through lib/plugin-system (props, registry). Inside your own feature, use relative imports.',
+      'Features talk through lib/, contracts/ and stores/. Inside your own feature, use relative imports.',
     ),
   },
-  // The shell hosts features only through the registry.
+  // The shell hosts features only through the generic plugin SDK and shell stores.
   {
     files: ['src/app/shell/**'],
-    rules: forbid(['features', 'routes'], 'The shell must not import features; read them from the registry.'),
+    rules: forbid(
+      ['features', 'routes', 'contracts'],
+      'The shell must stay domain-agnostic; read contributions from the registry.',
+    ),
   },
   {
     files: ['tests/**'],

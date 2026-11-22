@@ -1,13 +1,13 @@
 // ─────────────────────────────────────────────────────────────
 // The workspace sidebar: every panel registered for
-// 'workspace.detail', stacked. Explorer is always on; others show
-// when listed in ?panels=. Hidden panels stay mounted (<Activity>),
-// so e.g. the agent chat survives being toggled off and on.
+// WORKSPACE_DETAIL_CONTAINER, stacked. Panels receive no props—
+// they read workspace data from route loaders or workspace-bridge.
 // ─────────────────────────────────────────────────────────────
 import { Suspense } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { X } from 'lucide-react';
-import { togglePanel, useRegistry, type WorkspaceInfo } from '@/lib/plugin-system';
+import { togglePanel, useRegistry } from '@/lib/plugin-system';
+import { WORKSPACE_DETAIL_CONTAINER, type WorkspaceInfo } from '@/contracts/workspace';
 import { ResizableStack } from '@/components/ui/ResizableStack';
 import { useWorkbench } from '../stores/workbench';
 
@@ -30,7 +30,7 @@ export function SidebarPanels({ workspace, panels }: Props) {
       replace: true,
     });
 
-  const sections = registry.panelsFor('workspace.detail').map((p) => {
+  const sections = registry.panelsFor(WORKSPACE_DETAIL_CONTAINER).map((p) => {
     const Panel = p.component;
     return {
       id: p.id,
@@ -48,7 +48,7 @@ export function SidebarPanels({ workspace, panels }: Props) {
       ),
       body: (
         <Suspense fallback={<div className="empty">Loading…</div>}>
-          <Panel workspace={workspace} />
+          <Panel />
         </Suspense>
       ),
     };

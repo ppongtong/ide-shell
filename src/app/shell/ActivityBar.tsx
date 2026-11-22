@@ -60,11 +60,13 @@ function ActivityItem({ activity: a, location }: { activity: Activity; location:
         return;
 
       case 'togglePanel':
-        if (!location.wsId) return;
+        // Toggle ?panels= on whatever container route is currently active.
         void navigate({
-          to: '/workspaces/$wsId',
-          params: { wsId: location.wsId },
-          search: (prev) => ({ ...prev, panels: togglePanel(prev.panels, action.panelId) }),
+          to: '.',
+          search: ((prev: Record<string, unknown>) => ({
+            ...prev,
+            panels: togglePanel(typeof prev.panels === 'string' ? prev.panels : undefined, action.panelId),
+          })) as never,
           replace: true, // panel on/off is not worth a Back step
         });
         return;

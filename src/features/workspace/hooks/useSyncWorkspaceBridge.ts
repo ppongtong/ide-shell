@@ -8,13 +8,14 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect } from 'react';
 import { useRouter } from '@tanstack/react-router';
-import { itemKey, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
+import { useRegistry } from '@/lib/plugin-system';
+import { getItemTypes, itemKey, type Item, type WorkspaceInfo } from '@/contracts/workspace';
 import { useWorkspaceBridge } from '@/stores/workspace-bridge';
 import { pathTo } from '../api/workspaces';
 import { NONE, useWorkbench } from '../stores/workbench';
 
 export function useSyncWorkspaceBridge(workspace: WorkspaceInfo, activeItem: Item | undefined) {
-  const registry = useRegistry();
+  const itemTypes = getItemTypes(useRegistry());
   const router = useRouter();
   const openKeys = useWorkbench((s) => s.tabs[workspace.id] ?? NONE);
   const setSnapshot = useWorkspaceBridge((s) => s.setSnapshot);
@@ -51,7 +52,7 @@ export function useSyncWorkspaceBridge(workspace: WorkspaceInfo, activeItem: Ite
       openItem(itemId) {
         const item = byId.get(itemId);
         if (!item) return false;
-        const isFolder = !!registry.itemType.get(item.type)?.isContainer;
+        const isFolder = !!itemTypes.get(item.type)?.isContainer;
         const chain = pathTo(workspace.items, item.id).map((i) => i.id);
         const state = useWorkbench.getState();
         state.expandAll(workspace.id, isFolder ? chain : chain.slice(0, -1));
@@ -76,7 +77,7 @@ export function useSyncWorkspaceBridge(workspace: WorkspaceInfo, activeItem: Ite
         return true;
       },
     });
-  }, [workspace, registry, router, setActions]);
+  }, [workspace, itemTypes, router, setActions]);
 
   useEffect(() => {
     return () => {

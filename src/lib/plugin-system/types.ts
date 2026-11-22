@@ -1,37 +1,20 @@
 // ─────────────────────────────────────────────────────────────
-// The plugin contract. Every feature talks to the shell only
-// through these types — built-in features included.
+// Generic plugin contract. Zero app- or domain-specific types.
+// Domain contracts (e.g. src/contracts/workspace.ts) augment
+// `PluginContributions` to add typed domain extension points.
 // ─────────────────────────────────────────────────────────────
 import type { ComponentType, LazyExoticComponent } from 'react';
 
 export type Icon = ComponentType<{ size?: number | string }>;
-export type Lazy<P> = LazyExoticComponent<ComponentType<P>> | ComponentType<P>;
+export type Lazy<P = Record<string, never>> = LazyExoticComponent<ComponentType<P>> | ComponentType<P>;
 
-/** "Where am I", derived from the URL only (see shell-location.ts). */
+/** "Where am I", derived generically from the matched route and ?panels= param. */
 export interface ShellLocation {
   path: string;
-  view: 'workspace.list' | 'workspace.detail' | 'settings' | 'plugin' | 'other';
-  wsId?: string;
-  /** Extra sidebar panels switched on, e.g. ['agent']. Always-on panels are not listed. */
+  /** Matched leaf route id, e.g. '/workspaces/$wsId', '/settings', '/$activityId/$'. */
+  routeId?: string;
+  /** Extra sidebar panels switched on via ?panels=, e.g. ['agent']. */
   panels: string[];
-  /** Active tab, e.g. { type: 'file', id: 'utils' } */
-  item?: { type: string; id: string };
-}
-
-// ── Workspace data shared with panels and editors ──────────
-
-export interface Item {
-  id: string;
-  type: string;
-  name: string;
-  parentId: string | null;
-  content?: string;
-}
-
-export interface WorkspaceInfo {
-  id: string;
-  name: string;
-  items: Item[];
 }
 
 // ── Activities (activity-bar buttons) ───────────────────────
@@ -78,49 +61,34 @@ export interface Activity {
   action: RouteAction | TogglePanelAction | DialogAction;
 }
 
-// ── Sidebar panels (stacked in the workspace sidebar) ──────
-
-/** Panels receive the host workspace; cross-feature tab state & actions live in workspace-bridge. */
-export interface PanelProps {
-  workspace: WorkspaceInfo;
-}
+// ── Sidebar panels (generic container slots) ───────────────
 
 export interface SidebarPanel {
   id: string;
   title: string;
-  /** Which screen hosts it. Only workspace details has a sidebar today. */
-  container: 'workspace.detail';
+  /** Identifier of the host container (typically a route id, e.g. '/workspaces/$wsId'). */
+  container: string;
   /** Top-to-bottom order in the stack. */
   order: number;
-  /** Always shown (Explorer). Others appear when toggled on via ?panels= */
+  /** Always shown. Others appear when toggled on via ?panels= */
   alwaysOn?: boolean;
-  component: Lazy<PanelProps>;
-}
-
-// ── Explorer item types ─────────────────────────────────────
-
-export interface EditorProps {
-  workspace: WorkspaceInfo;
-  item: Item;
-}
-
-export interface ItemType {
-  type: string;
-  label: string;
-  icon: Icon;
-  /** Folders expand/collapse instead of opening a tab. */
-  isContainer?: boolean;
-  /** Rendered inside the tab. Omit for containers. */
-  editor?: Lazy<EditorProps>;
+  /** Panels read their host context from route loaders or shared bridge stores. */
+  component: Lazy;
 }
 
 // ── Plugin ──────────────────────────────────────────────────
 
-export interface Plugin {
+/**
+ * Augmentation point for domain-specific plugin contributions
+ * (see src/contracts/workspace.ts for an example).
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface PluginContributions {}
+
+export interface Plugin extends Partial<PluginContributions> {
   id: string;
   activities?: Activity[];
   panels?: SidebarPanel[];
-  itemTypes?: ItemType[];
 }
 
 /** Identity helper for autocomplete and type checks. */

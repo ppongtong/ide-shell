@@ -7,7 +7,7 @@
 //     or read inside async/event code: useWorkspaceBridge.getState()
 // ─────────────────────────────────────────────────────────────
 import { create } from 'zustand';
-import type { Item, WorkspaceInfo } from '@/lib/plugin-system';
+import type { Item, WorkspaceInfo } from '@/contracts/workspace';
 
 export interface WorkspaceSnapshot {
   workspace: WorkspaceInfo;

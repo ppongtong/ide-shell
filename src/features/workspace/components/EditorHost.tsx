@@ -4,7 +4,8 @@
 // switching workspaces never leaks state across colliding item IDs.
 // ─────────────────────────────────────────────────────────────
 import { Activity, Suspense } from 'react';
-import { parseItem, useRegistry, type WorkspaceInfo } from '@/lib/plugin-system';
+import { useRegistry } from '@/lib/plugin-system';
+import { getItemTypes, parseItem, type WorkspaceInfo } from '@/contracts/workspace';
 import { NONE, useWorkbench } from '../stores/workbench';
 
 interface Props {
@@ -37,14 +38,14 @@ export function EditorHost({ workspace, activeKey }: Props) {
 }
 
 function EditorFor({ workspace, itemKey }: { workspace: WorkspaceInfo; itemKey: string }) {
-  const registry = useRegistry();
+  const itemTypes = getItemTypes(useRegistry());
   const ref = parseItem(itemKey);
   if (!ref) return <div className="empty">Invalid item key “{itemKey}”.</div>;
 
   const item = workspace.items.find((i) => i.id === ref.id && i.type === ref.type);
   if (!item) return <div className="empty">“{itemKey}” is not in this workspace.</div>;
 
-  const Editor = registry.itemType.get(item.type)?.editor;
+  const Editor = itemTypes.get(item.type)?.editor;
   if (!Editor) return <div className="empty">No editor registered for type “{item.type}”.</div>;
 
   return (

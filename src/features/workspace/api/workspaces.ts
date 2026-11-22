@@ -1,5 +1,5 @@
 // Mock backend. Swap the bodies for real fetch calls.
-import type { Item } from '@/lib/plugin-system';
+import type { Item } from '@/contracts/workspace';
 
 export interface Workspace {
   id: string;
