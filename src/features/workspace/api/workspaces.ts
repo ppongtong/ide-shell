@@ -148,6 +148,14 @@ const db: Workspace[] = [
         parentId: null,
         content: '# Acme\n\nDemo workspace.\n',
       },
+      {
+        id: 'revenue-analysis',
+        type: 'notebook',
+        name: 'revenue.nb',
+        parentId: null,
+        content:
+          '# Quarterly Revenue Forecast\n---\nconst months = [120, 135, 160];\nconst avg = months.reduce((a, b) => a + b, 0) / months.length;\n---\nconst projectedQ2 = Math.round(avg * 3 * 1.12);',
+      },
     ],
   },
   {

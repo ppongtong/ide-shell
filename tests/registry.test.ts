@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createRegistry, type Activity, type Plugin, type SidebarPanel } from '@/lib/plugin-system';
 import { workspacePlugin } from '../src/features/workspace/plugin.ts';
 import { agentPlugin } from '../src/features/agent/plugin.ts';
+import { notebookPlugin } from '../src/features/notebook/plugin.ts';
 import { reportsPlugin } from '../src/features/reports/plugin.ts';
 import { settingsPlugin } from '../src/features/settings/plugin.ts';
 import { useShell } from '../src/stores/shell-store.ts';
@@ -150,14 +151,25 @@ describe('createRegistry', () => {
     );
   });
 
-  it('validates built-in plugins including route, togglePanel, and dialog activities + shell dialog state', () => {
+  it('validates built-in plugins including route, togglePanel, dialog, and external itemType renderer plugins', () => {
     const explorerStub: Plugin = {
       id: 'core.explorer',
       panels: [{ id: 'explorer', title: 'Explorer', container: 'workspace.detail', order: 10, alwaysOn: true, component: View }],
     };
-    const reg = createRegistry([workspacePlugin, explorerStub, agentPlugin, reportsPlugin, settingsPlugin]);
+    const reg = createRegistry([
+      workspacePlugin,
+      explorerStub,
+      agentPlugin,
+      notebookPlugin,
+      reportsPlugin,
+      settingsPlugin,
+    ]);
     const shortcuts = reg.activity.get('shortcuts');
     assert.equal(shortcuts?.action.kind, 'dialog');
+
+    const notebookType = reg.itemType.get('notebook');
+    assert.equal(notebookType?.pluralLabel, 'Notebooks');
+    assert.ok(notebookType?.editor, 'expected notebookPlugin to register a lazy editor renderer');
 
     useShell.getState().showDialog('shortcuts');
     assert.equal(useShell.getState().openDialog, 'shortcuts');

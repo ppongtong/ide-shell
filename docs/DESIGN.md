@@ -12,7 +12,7 @@ IDE Shell is a VS Code–style web app shell built with **React 19.3**, **TanSta
 
 - **What it provides:**
   - A fixed outer frame: left Activity Bar, top Breadcrumb bar, main page area, and a shared modal host.
-  - A boot-time plugin registry so features (`workspace`, `explorer`, `agent`, `reports`, `settings`) contribute buttons, sidebar panels, pages, and file editors without importing each other's internals.
+  - A boot-time plugin registry so features (`workspace`, `explorer`, `agent`, `notebook`, `reports`, `settings`) contribute buttons, sidebar panels, pages, and item-type editors without importing each other's internals.
   - A typed plugin contract pattern (`createPluginBridge` in `lib/plugin-system` + `src/features/<name>/contract.ts`): in-house `workspace` and `explorer` features demonstrate bidirectional cross-plugin state sharing consumed by `agent` and breadcrumbs, while all features read route-agnostic shell state (`useShellLocation`).
 - **What it intentionally leaves out (for now):**
   - Real backend persistence (`workspaces.ts` and `agent.ts` use in-memory mock data that resets on a full browser reload).
@@ -86,7 +86,7 @@ flowchart TD
     Sidebar --> ActAg["Activity: AgentPanel"]
 
     EditorHost --> ActDet["Activity: WorkspaceDetailsTab"]
-    EditorHost --> ActEd["Activity: FileEditor / DatasetEditor"]
+    EditorHost --> ActEd["Activity: FileEditor / DatasetEditor / NotebookEditor"]
 ```
 
 ---
@@ -369,7 +369,7 @@ useLayoutEffect(() => {
 
 ```mermaid
 flowchart LR
-    Plugins["src/app/plugins.ts (5 plugins)"] --> Create["createRegistry(plugins)"]
+    Plugins["src/app/plugins.ts (6 plugins)"] --> Create["createRegistry(plugins)"]
     Create --> CheckIds["Check unique activity, panel, itemType IDs"]
     Create --> CheckOrder["Check unique order per position and container"]
     CheckOrder --> CheckRefs["Check togglePanel targets and plugin page routes"]
@@ -633,12 +633,26 @@ To add a brand-new plugin, export it with `definePlugin(...)` from `src/features
 | Goal | What to change |
 | --- | --- |
 | Share state/actions with other plugins | Export `createPluginBridge<Snapshot, Actions>()` from `src/features/<name>/contract.ts` (follow `src/features/explorer/contract.ts`). Other features import `@/features/<name>/contract`. |
-| Add a new Explorer item type (e.g. `notebook`) | Add `{ type, label, pluralLabel, icon, editor: lazy(...) }` to `itemTypes` in a plugin. `ExplorerPanel` renders a collapsible `group:<type>` section for every registered non-container type automatically. |
+| Add a new Explorer item-type renderer | Add `{ type, label, pluralLabel, icon, editor: lazy(...) }` to `itemTypes` in a plugin (see `src/features/notebook/plugin.ts`). `ExplorerPanel`, `TabBar`, and `EditorHost` pick it up automatically. |
 | Add a new sidebar panel + toggle button | Add a `panels` entry (`container: 'workspace.detail'`) and an `activities` entry with `action: { kind: 'togglePanel', panelId }`. |
 | Add a standalone plugin page | Add an `activities` entry with `action: { kind: 'route', to: '/<id>', page: lazy(...) }`. No file in `src/routes/` needed. |
 | Add a new primary workspace type | Add an entry to `PRIMARY_TYPES` in `src/features/workspace/api/workspaces.ts` (or load options from your backend via a `loader` on `src/routes/workspaces/new.tsx`). |
-| Add a new dialog button | Add an `activities` entry with `action: { kind: 'dialog', dialog: lazy(...) }`. |
+| Add a new dialog button | Add an `activities` entry with `action: { kind: 'dialog', dialog: lazy(...) }` (see `ShortcutsDialog` in `src/features/settings/`). |
 | Connect a real backend | Replace the mock bodies in `src/features/workspace/api/workspaces.ts` and `src/features/agent/api/agent.ts` with `fetch` calls. Keep `router.invalidate()` after mutations. |
+
+### 8.1 Registering Item-Type Renderers (`workspace/plugin.ts` vs `src/features/<name>/plugin.ts`)
+
+`createRegistry(plugins)` merges `itemTypes` across every loaded plugin (`plugins.flatMap((p) => p.itemTypes ?? [])`). Both options use the exact same `ItemType` contract—choose based on ownership and complexity:
+
+1. **Core / lightweight viewer (`src/features/workspace/plugin.ts`):**
+   Use when the renderer is 1–2 small files with no independent store, API, sidebar panel, or cross-plugin `contract.ts` (like `FileEditor` and `DatasetEditor` in `src/features/workspace/editors/`).
+2. **Standalone feature plugin (`src/features/<name>/plugin.ts`):**
+   Use when the renderer is a full feature domain—owning its own state/stores, API calls, panels, buttons, or `contract.ts`, or when you want to toggle/maintain it independently without growing `features/workspace/` into a monolith (since ESLint blocks `workspace/` from importing editors out of sibling feature folders).
+
+Reference implementation in `src/features/notebook/`:
+- `src/features/notebook/editors/NotebookEditor.tsx` — receives `EditorProps` (`{ workspace, item }`), renders interactive runnable cells, and preserves run output across tab switches via `EditorHost`'s `<Activity>`.
+- `src/features/notebook/plugin.ts` — maps `type: 'notebook'` -> `lazy(() => import('./editors/NotebookEditor'))` with `icon: BookOpen` and `pluralLabel: 'Notebooks'`.
+- `src/app/plugins.ts` — registers `notebookPlugin`; `ExplorerPanel` automatically adds a collapsible **Notebooks** section (`revenue.nb` in `Acme`), `TabBar` renders the tab icon, and `EditorHost` lazy-loads `NotebookEditor` on first open.
 
 ---
 

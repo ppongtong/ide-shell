@@ -108,6 +108,23 @@ a.crumb:hover, button.crumb:hover { color: var(--text); background: var(--hover)
 .dataset th, .dataset td, .registry th, .registry td { border: 1px solid var(--border); padding: 4px 10px; text-align: left; }
 .dataset th, .registry th { background: var(--panel-head); }
 
+.notebook { flex: 1; overflow: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+.notebook-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.notebook-cells { display: flex; flex-direction: column; gap: 10px; max-width: 680px; }
+.nb-cell { border: 1px solid var(--border); border-radius: 6px; background: var(--side); overflow: hidden; }
+.nb-cell.markdown { padding: 10px 12px; font-weight: 600; }
+.nb-cell.markdown p { margin: 0; }
+.nb-cell-bar {
+  display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 4px 12px;
+  border-bottom: 1px solid var(--border); background: var(--panel-head); font-size: 11px;
+}
+.nb-run { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; font-size: 12px; }
+.nb-code { margin: 0; padding: 10px 12px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto; }
+.nb-out {
+  display: block; padding: 6px 12px; border-top: 1px solid var(--border); background: var(--bg);
+  color: #89d185; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .empty { padding: 24px; color: var(--muted); }
 .hint { color: var(--muted); }
 .btn { padding: 6px 12px; border-radius: 4px; background: var(--accent); color: #fff; }
