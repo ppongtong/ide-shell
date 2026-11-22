@@ -10,7 +10,7 @@ export type Lazy<P> = LazyExoticComponent<ComponentType<P>> | ComponentType<P>;
 /** "Where am I", derived from the URL only (see shell-location.ts). */
 export interface ShellLocation {
   readonly path: string;
-  readonly view: 'workspace.list' | 'workspace.detail' | 'settings' | 'plugin' | 'other';
+  readonly view: 'workspace.list' | 'workspace.new' | 'workspace.detail' | 'settings' | 'plugin' | 'other';
   readonly wsId?: string;
   /** Extra sidebar panels switched on, e.g. ['agent']. Always-on panels are not listed. */
   readonly panels: readonly string[];
@@ -31,6 +31,8 @@ export interface Item {
 export interface WorkspaceInfo {
   readonly id: string;
   readonly name: string;
+  readonly description?: string;
+  readonly primaryType?: string;
   readonly items: readonly Item[];
 }
 
@@ -80,9 +82,9 @@ export interface Activity {
 
 // ── Sidebar panels (stacked in the workspace sidebar) ──────
 
-/** Panels receive the host workspace; cross-feature tab state & actions live in workspace-bridge. */
+/** Panels receive the host workspace (or null during draft creation on /workspaces/new). */
 export interface PanelProps {
-  readonly workspace: WorkspaceInfo;
+  readonly workspace: WorkspaceInfo | null;
 }
 
 export interface SidebarPanel {
@@ -107,8 +109,10 @@ export interface EditorProps {
 export interface ItemType {
   readonly type: string;
   readonly label: string;
+  /** Plural section heading in the Explorer (defaults to `${label}s`). */
+  readonly pluralLabel?: string;
   readonly icon: Icon;
-  /** Folders expand/collapse instead of opening a tab. */
+  /** Containers expand/collapse instead of opening a tab. */
   readonly isContainer?: boolean;
   /** Rendered inside the tab. Omit for containers. */
   readonly editor?: Lazy<EditorProps>;

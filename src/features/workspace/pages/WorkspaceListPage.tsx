@@ -1,5 +1,5 @@
 import { getRouteApi, Link } from '@tanstack/react-router';
-import { FolderKanban } from 'lucide-react';
+import { FolderKanban, Plus } from 'lucide-react';
 import { useWorkbench } from '../stores/workbench';
 
 const workspacesRoute = getRouteApi('/workspaces');
@@ -12,7 +12,13 @@ export function WorkspaceListPage() {
     <div className="ws-list">
       {/* React 19: <title> anywhere in the tree is hoisted into <head>. */}
       <title>Workspaces · IDE</title>
-      <h1>Workspaces</h1>
+      <div className="ws-list-head">
+        <h1>Workspaces</h1>
+        <Link className="btn btn-inline" to="/workspaces/new">
+          <Plus size={14} aria-hidden="true" />
+          New workspace
+        </Link>
+      </div>
       <div className="cards">
         {workspaces.map((w) => (
           <Link

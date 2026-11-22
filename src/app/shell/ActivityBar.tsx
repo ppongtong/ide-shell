@@ -6,7 +6,6 @@
 // ─────────────────────────────────────────────────────────────
 import { useNavigate } from '@tanstack/react-router';
 import {
-  inArea,
   togglePanel,
   useRegistry,
   useShellLocation,
@@ -16,10 +15,10 @@ import {
 import { ActivityBarButton, type ActivityButtonState } from '@/components/ui/ActivityBarButton';
 import { useShell } from '@/stores/shell-store';
 
-function activityState(a: Activity, loc: ShellLocation): ActivityButtonState {
+function activityState(a: Activity, loc: ShellLocation, activeRouteId: string | undefined): ActivityButtonState {
   switch (a.action.kind) {
     case 'route':
-      return inArea(loc.path, a.action.to) ? 'selected' : 'off';
+      return a.id === activeRouteId ? 'selected' : 'off';
     case 'togglePanel':
       return loc.panels.includes(a.action.panelId) ? 'on' : 'off';
     case 'dialog':
@@ -30,24 +29,33 @@ function activityState(a: Activity, loc: ShellLocation): ActivityButtonState {
 export function ActivityBar() {
   const registry = useRegistry();
   const location = useShellLocation();
+  const activeRouteId = registry.activeRouteActivity(location.path)?.id;
 
   return (
     <nav className="activity-bar" aria-label="Activities">
       <div className="group">
         {registry.topActivities.map((a) => (
-          <ActivityItem key={a.id} activity={a} location={location} />
+          <ActivityItem key={a.id} activity={a} location={location} activeRouteId={activeRouteId} />
         ))}
       </div>
       <div className="group">
         {registry.bottomActivities.map((a) => (
-          <ActivityItem key={a.id} activity={a} location={location} />
+          <ActivityItem key={a.id} activity={a} location={location} activeRouteId={activeRouteId} />
         ))}
       </div>
     </nav>
   );
 }
 
-function ActivityItem({ activity: a, location }: { activity: Activity; location: ShellLocation }) {
+function ActivityItem({
+  activity: a,
+  location,
+  activeRouteId,
+}: {
+  activity: Activity;
+  location: ShellLocation;
+  activeRouteId: string | undefined;
+}) {
   const navigate = useNavigate();
   const last = useShell((s) => s.lastHref[a.id]);
   const showDialog = useShell((s) => s.showDialog);
@@ -70,7 +78,7 @@ function ActivityItem({ activity: a, location }: { activity: Activity; location:
         return;
 
       case 'route':
-        if (!inArea(location.path, action.to)) {
+        if (activeRouteId !== a.id) {
           // From another area: back to where you were, or to the area's home.
           if (action.rememberLastLocation && last) void navigate({ href: last });
           else void navigate({ to: action.to });
@@ -85,7 +93,7 @@ function ActivityItem({ activity: a, location }: { activity: Activity; location:
     <ActivityBarButton
       title={a.title}
       icon={a.icon}
-      state={activityState(a, location)}
+      state={activityState(a, location, activeRouteId)}
       disabled={!(a.enabledWhen?.(location) ?? true)}
       disabledReason={a.disabledReason}
       role={a.action.kind === 'togglePanel' ? 'toggle' : a.action.kind === 'dialog' ? 'dialog' : 'link'}

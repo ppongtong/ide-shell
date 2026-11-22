@@ -32,6 +32,7 @@ src/
     index.tsx             redirect → /workspaces
     workspaces/route.tsx  layout + workspace list loader, crumb "Workspaces"
     workspaces/index.tsx  list
+    workspaces/new.tsx    draft creation workbench (pinned Details tab)
     workspaces/$wsId.tsx  ?item & ?panels, loader, Breadcrumbs → details
     settings.tsx
     $activityId/$.tsx     catch-all for plugin pages (/reports, /reports/q1)
@@ -72,7 +73,7 @@ Features talk to each other only through `lib/plugin-system` (the IDE plugin SDK
 | `<Activity>` (19.2) | `components/ui/ResizableStack.tsx` | Hidden sidebar panels keep their state (agent chat) |
 | `<ViewTransition>` (19.3) | `features/agent/components/AgentPanel.tsx` | New messages animate in |
 | `useEffectEvent` (19.2) | `app/shell/Shell.tsx`, `WorkspaceDetailPage.tsx` | Effects read latest values without extra dependencies |
-| Actions: `useActionState`, `useFormStatus`, `<form action>` | `NewWorkspaceDialog.tsx` | Declarative form validation and pending state |
+| Actions: `useActionState`, `useFormStatus`, `<form action>` | `WorkspaceDetailsTab.tsx` | Declarative form validation and pending state |
 | `useTransition` + `useOptimistic` | `AgentPanel.tsx` | Messages appear immediately while clearing the chat input right away |
 | `use(Context)` | `lib/plugin-system/registry.ts` | Read context cleanly |
 | `<Context value>` | `app/app-registry.tsx` | No `.Provider` |

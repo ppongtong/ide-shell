@@ -1,7 +1,7 @@
 // The frame around every page: activity bar | breadcrumbs + page, plus the dialog host.
 import { useEffect, useEffectEvent } from 'react';
 import { Outlet, useRouterState } from '@tanstack/react-router';
-import { inArea, useRegistry } from '@/lib/plugin-system';
+import { useRegistry } from '@/lib/plugin-system';
 import { useShell } from '@/stores/shell-store';
 import { ActivityBar } from './ActivityBar';
 import { Breadcrumbs } from './Breadcrumbs';
@@ -31,10 +31,9 @@ function useRememberLastLocation() {
 
   // React 19.2 useEffectEvent: reads the latest registry without making it an effect dependency.
   const remember = useEffectEvent((path: string, url: string) => {
-    for (const a of [...registry.topActivities, ...registry.bottomActivities]) {
-      if (a.action.kind === 'route' && a.action.rememberLastLocation && inArea(path, a.action.to)) {
-        rememberHref(a.id, url);
-      }
+    const active = registry.activeRouteActivity(path);
+    if (active?.action.kind === 'route' && active.action.rememberLastLocation) {
+      rememberHref(active.id, url);
     }
   });
 

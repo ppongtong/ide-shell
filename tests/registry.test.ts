@@ -53,6 +53,28 @@ describe('createRegistry', () => {
     );
   });
 
+  it('picks the longest matching route activity for nested paths like /workspaces/new', () => {
+    const reg = createRegistry([
+      {
+        id: 'p1',
+        activities: [
+          activity('workspaces', 10, { action: { kind: 'route', to: '/workspaces', rememberLastLocation: true } }),
+          activity('new-workspace', 90, {
+            position: 'bottom',
+            action: { kind: 'route', to: '/workspaces/new' },
+          }),
+          activity('settings', 100, { position: 'bottom', action: { kind: 'route', to: '/settings' } }),
+        ],
+      },
+    ]);
+
+    assert.equal(reg.activeRouteActivity('/workspaces')?.id, 'workspaces');
+    assert.equal(reg.activeRouteActivity('/workspaces/acme')?.id, 'workspaces');
+    assert.equal(reg.activeRouteActivity('/workspaces/new')?.id, 'new-workspace');
+    assert.equal(reg.activeRouteActivity('/settings')?.id, 'settings');
+    assert.equal(reg.activeRouteActivity('/unknown'), undefined);
+  });
+
   it('allows the same order in different activity positions (top vs bottom)', () => {
     const reg = createRegistry([
       {

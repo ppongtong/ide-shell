@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // Breadcrumbs for /workspaces/$wsId, plugged in via the route's
-// staticData.Breadcrumbs:   Acme ▾ › src › utils.ts
+// staticData.Breadcrumbs:   Acme ▾ › Storefront Core › checkout.ts
 // Reads workspace summaries from the parent /workspaces route loader.
 // ─────────────────────────────────────────────────────────────
 import { Fragment, type ReactNode } from 'react';
@@ -46,19 +46,26 @@ export function WorkspaceBreadcrumbs(): ReactNode {
           <option key={w.id} value={w.id}>{w.name}</option>
         ))}
       </select>
-      {chain.map((it, i) => (
-        <Fragment key={it.id}>
+      {chain.length === 0 ? (
+        <>
           <CrumbSep />
-          {i === chain.length - 1 ? (
-            <CrumbText>{it.name}</CrumbText>
-          ) : (
-            // A folder crumb reveals the folder in the Explorer.
-            <CrumbButton onClick={() => expandAll(workspace.id, chain.slice(0, i + 1).map((x) => x.id))}>
-              {it.name}
-            </CrumbButton>
-          )}
-        </Fragment>
-      ))}
+          <CrumbText>Details</CrumbText>
+        </>
+      ) : (
+        chain.map((it, i) => (
+          <Fragment key={it.id}>
+            <CrumbSep />
+            {i === chain.length - 1 ? (
+              <CrumbText>{it.name}</CrumbText>
+            ) : (
+              // A folder/primary crumb reveals it in the Explorer.
+              <CrumbButton onClick={() => expandAll(workspace.id, chain.slice(0, i + 1).map((x) => x.id))}>
+                {it.name}
+              </CrumbButton>
+            )}
+          </Fragment>
+        ))
+      )}
     </>
   );
 }

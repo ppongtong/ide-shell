@@ -11,8 +11,8 @@ interface WorkbenchData {
   readonly tabs: Readonly<Record<string, readonly string[]>>;
   /** Last active tab per workspace, so switching workspaces lands on it. */
   readonly lastActive: Readonly<Record<string, string>>;
-  /** Expanded folder ids per workspace. */
-  readonly expanded: Readonly<Record<string, readonly string[]>>;
+  /** Collapsed folder/group ids per workspace (everything starts expanded by default). */
+  readonly collapsed: Readonly<Record<string, readonly string[]>>;
   /** Relative heights of stacked sidebar panels: { explorer: 1, agent: 1 } */
   readonly panelSizes: Readonly<Record<string, number>>;
 }
@@ -30,7 +30,7 @@ interface WorkbenchState extends WorkbenchData {
 const initialData: WorkbenchData = {
   tabs: {},
   lastActive: {},
-  expanded: {},
+  collapsed: {},
   panelSizes: {},
 };
 
@@ -50,7 +50,7 @@ export const useWorkbench = create<WorkbenchState>()(
         const i = list.indexOf(key);
         const rest = list.filter((k) => k !== key);
         set((s) => ({ tabs: { ...s.tabs, [ws]: rest } }));
-        return rest[i] ?? rest[i - 1] ?? null; // right neighbour, else left, else none
+        return rest[i] ?? rest[i - 1] ?? null; // right neighbour, else left, else Details tab
       },
 
       setLastActive: (ws, key) =>
@@ -64,17 +64,28 @@ export const useWorkbench = create<WorkbenchState>()(
 
       toggleFolder: (ws, id) =>
         set((s) => {
-          const list = s.expanded[ws] ?? [];
+          const list = s.collapsed[ws] ?? [];
           const next = list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
-          return { expanded: { ...s.expanded, [ws]: next } };
+          return { collapsed: { ...s.collapsed, [ws]: next } };
         }),
 
       expandAll: (ws, ids) =>
-        set((s) => ({ expanded: { ...s.expanded, [ws]: [...new Set([...(s.expanded[ws] ?? []), ...ids])] } })),
+        set((s) => {
+          const list = s.collapsed[ws];
+          if (!list?.length) return s;
+          const toExpand = new Set(ids);
+          const next = list.filter((id) => !toExpand.has(id));
+          return next.length === list.length ? s : { collapsed: { ...s.collapsed, [ws]: next } };
+        }),
 
       setPanelSizes: (sizes) => set((s) => ({ panelSizes: { ...s.panelSizes, ...sizes } })),
     }),
-    { name: persistName('workspace'), version: 1, storage: persistStorage },
+    {
+      name: persistName('workspace'),
+      version: 2,
+      storage: persistStorage,
+      migrate: () => initialData,
+    },
   ),
 );
 

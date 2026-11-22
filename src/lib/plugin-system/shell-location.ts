@@ -9,6 +9,7 @@ import { parseItem, parsePanels } from './search-params';
 export function useShellLocation(): ShellLocation {
   const path = useLocation({ select: (l) => l.pathname });
   const detail = useMatch({ from: '/workspaces/$wsId', shouldThrow: false });
+  const create = useMatch({ from: '/workspaces/new', shouldThrow: false });
   const list = useMatch({ from: '/workspaces/', shouldThrow: false });
   const settings = useMatch({ from: '/settings', shouldThrow: false });
   const pluginPage = useMatch({ from: '/$activityId/$', shouldThrow: false });
@@ -22,11 +23,9 @@ export function useShellLocation(): ShellLocation {
       item: parseItem(detail.search.item),
     };
   }
+  if (create) return { path, view: 'workspace.new', panels: [] };
   if (list) return { path, view: 'workspace.list', panels: [] };
   if (settings) return { path, view: 'settings', panels: [] };
   if (pluginPage) return { path, view: 'plugin', panels: [] };
   return { path, view: 'other', panels: [] };
 }
-
-/** Is `path` inside the area whose home is `to`? '/workspaces/acme' is inside '/workspaces'. */
-export const inArea = (path: string, to: string) => path === to || path.startsWith(to + '/');

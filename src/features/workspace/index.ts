@@ -2,5 +2,6 @@
 export { workspacePlugin } from './plugin';
 export { workspacesApi } from './api/workspaces';
 export { WorkspaceListPage } from './pages/WorkspaceListPage';
+export { NewWorkspacePage } from './pages/NewWorkspacePage';
 export { WorkspaceDetailPage } from './pages/WorkspaceDetailPage';
 export { WorkspaceBreadcrumbs } from './components/WorkspaceBreadcrumbs';
