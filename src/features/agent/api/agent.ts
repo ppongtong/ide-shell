@@ -1,10 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // Mock agent & contract action dispatcher.
 // Consumes public contracts from BOTH `workspace` and `explorer`
-// without importing either feature's internal implementation or route paths.
-// Understands: "open <item>", "close <item>", "collapse all", "expand all".
+// without importing either feature's internals, item-type rules, or route paths.
+// Understands: "primary key", "show primary", "open <item>", "close <item>", "collapse all", "expand all".
 // ─────────────────────────────────────────────────────────────
-import type { Item, ItemRenderer, WorkspaceInfo } from '@/lib/plugin-system';
 import { useWorkspaceContract, type WorkspaceSnapshot } from '@/features/workspace/contract';
 import { useExplorerContract } from '@/features/explorer/contract';
 
@@ -40,7 +39,7 @@ function reply(question: string, ctx: WorkspaceSnapshot | null): AgentReply {
       actions: [{ target: 'explorer', type: 'expandAll' }],
     };
   }
-  if (normalized === 'show primary' || normalized === 'show details' || normalized === 'open details') {
+  if (normalized === 'show primary' || normalized === 'open primary') {
     return {
       text: `(demo) Showing ${ws.name} primary view.`,
       actions: [{ target: 'workspace', type: 'showPrimary' }],
@@ -85,27 +84,12 @@ function reply(question: string, ctx: WorkspaceSnapshot | null): AgentReply {
   };
 }
 
-function chainIdsTo(items: readonly Item[], id: string): string[] {
-  const byId = new Map(items.map((i) => [i.id, i]));
-  const ids: string[] = [];
-  const seen = new Set<string>();
-  for (let cur = byId.get(id); cur && !seen.has(cur.id); cur = cur.parentId ? byId.get(cur.parentId) : undefined) {
-    seen.add(cur.id);
-    ids.unshift(cur.id);
-  }
-  return ids;
-}
-
 /**
  * Executes one `AgentAction` against the workspace/explorer contracts.
- * `primary` and folder-only items reveal in Explorer (and switch to the pinned Primary tab for `primary`).
+ * `openItem` opens a tab (or switches to Primary) and falls back to `revealItem` for folders.
  * Returns `null` on success, or a human-readable explanation if nothing changed.
  */
-export function runAgentAction(
-  action: AgentAction,
-  workspace: WorkspaceInfo,
-  renderers: ReadonlyMap<string, ItemRenderer>,
-): string | null {
+export function runAgentAction(action: AgentAction): string | null {
   if (action.target === 'explorer') {
     const explorerActions = useExplorerContract.getState().actions;
     if (!explorerActions) return 'Explorer is not available.';
@@ -119,23 +103,12 @@ export function runAgentAction(
     wsActions.showPrimary();
     return null;
   }
-
-  const item = workspace.items.find((i) => i.id === action.itemId);
-  const renderer = item ? renderers.get(item.type) : undefined;
-  const isPrimary = item?.type === 'primary';
-  const isFolderOnly = !!item && !!renderer && !renderer.component;
-
-  if (item && (isPrimary || isFolderOnly)) {
-    if (action.type === 'closeItem') return `${item.name} is not a closable tab.`;
-    if (isPrimary) wsActions.showPrimary();
-    const explorerActions = useExplorerContract.getState().actions;
-    if (!explorerActions) return 'Explorer is not available.';
-    explorerActions.revealItems(workspace.id, chainIdsTo(workspace.items, item.id));
-    return null;
+  if (action.type === 'closeItem') {
+    return wsActions.closeItem(action.itemId) ? null : 'That tab is not open.';
   }
 
-  const ok = wsActions[action.type](action.itemId);
-  if (!ok && action.type === 'closeItem') return 'That tab is already closed.';
-  if (!ok) return 'Could not open that item.';
+  const opened = wsActions.openItem(action.itemId);
+  const revealed = useExplorerContract.getState().actions?.revealItem(action.itemId) ?? false;
+  if (!opened && !revealed) return 'Could not open that item.';
   return null;
 }

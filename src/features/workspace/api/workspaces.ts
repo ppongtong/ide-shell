@@ -1,5 +1,5 @@
 // Mock backend. Swap the bodies for real fetch calls.
-import { EMPTY, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
+import { EMPTY, PRIMARY_TYPE, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
 import type { PrimarySelectionInput } from '../contract';
 
 export interface Workspace extends WorkspaceInfo {
@@ -186,12 +186,12 @@ export const workspacesApi = {
 
     const rootId = `primary-${wsId}`;
     const prevPrimaryIds = new Set(
-      existing.items.filter((i) => i.type === 'primary' || i.parentId === rootId).map((i) => i.id),
+      existing.items.filter((i) => i.type === PRIMARY_TYPE || i.parentId === rootId).map((i) => i.id),
     );
     const keptItems = existing.items.filter((i) => !prevPrimaryIds.has(i.id));
 
     const seeded: Item[] = [
-      { id: rootId, type: 'primary', name: name.trim(), parentId: null, content },
+      { id: rootId, type: PRIMARY_TYPE, name: name.trim(), parentId: null, content },
       ...children.map((c) => ({
         id: `${rootId}-${c.id}`,
         type: c.type,

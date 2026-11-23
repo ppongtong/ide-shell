@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { itemKey, parseItem, parsePanels, togglePanel } from '@/lib/plugin-system';
-import { indexItems, validateDetailSearch } from '../src/features/workspace/lib/search.ts';
+import { findPrimaryItem, itemKey, parseItem, parsePanels, PRIMARY_TYPE, togglePanel } from '@/lib/plugin-system';
+import { indexItems, openableKeys, validateDetailSearch } from '../src/features/workspace/lib/search.ts';
 
 describe('search-params & workspace search helpers', () => {
   it('parses valid type:id item keys and rejects malformed keys', () => {
@@ -38,16 +38,28 @@ describe('search-params & workspace search helpers', () => {
     assert.equal(togglePanel('agent,outline', 'agent'), 'outline');
   });
 
-  it('caches item lookup maps per workspace items array reference', () => {
+  it('caches item lookup maps per workspace items array reference and resolves primary/openable items', () => {
+    const Icon = () => null;
+    const renderers = new Map([
+      [PRIMARY_TYPE, { type: PRIMARY_TYPE, label: 'Primary', icon: Icon, component: Icon }],
+      ['folder', { type: 'folder', label: 'Folder', icon: Icon }],
+      ['file', { type: 'file', label: 'File', icon: Icon, component: Icon }],
+    ]);
     const ws = {
       id: 'acme',
       name: 'Acme',
-      items: [{ id: 'utils', type: 'file', name: 'utils.ts', parentId: null }],
+      items: [
+        { id: 'primary-acme', type: PRIMARY_TYPE, name: 'Storefront Core', parentId: null },
+        { id: 'src', type: 'folder', name: 'src', parentId: null },
+        { id: 'utils', type: 'file', name: 'utils.ts', parentId: 'src' },
+      ],
     };
     const first = indexItems(ws);
     const second = indexItems(ws);
     assert.equal(first, second);
     assert.equal(first.byId.get('utils')?.name, 'utils.ts');
     assert.equal(first.byKey.get('file:utils')?.name, 'utils.ts');
+    assert.equal(findPrimaryItem(ws)?.id, 'primary-acme');
+    assert.deepEqual([...openableKeys(ws, renderers)], ['file:utils']);
   });
 });

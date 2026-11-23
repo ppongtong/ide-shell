@@ -4,8 +4,9 @@
 // `registry.itemRenderer.get(type)?.component` — ItemRendererHost
 // never knows what any plugin renders inside its tab.
 // ─────────────────────────────────────────────────────────────
-import { Activity, Suspense } from 'react';
-import { parseItem, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
+import { Suspense } from 'react';
+import { LazyActivity } from '@/components/ui/LazyActivity';
+import { parseItem, PRIMARY_TYPE, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
 import { indexItems } from '../lib/search';
 
 interface Props {
@@ -21,7 +22,7 @@ export function ItemRendererHost({ workspace, primaryItem, openKeys, activeKey }
 
   return (
     <div className="editors">
-      <Activity key={`${workspace.id}:__primary__`} mode={!activeKey ? 'visible' : 'hidden'}>
+      <LazyActivity key={`${workspace.id}:__primary__`} active={!activeKey}>
         <div
           id={`panel-${workspace.id}-__primary__`}
           className="editor"
@@ -31,10 +32,10 @@ export function ItemRendererHost({ workspace, primaryItem, openKeys, activeKey }
         >
           <PrimarySlot workspace={workspace} item={primaryItem} />
         </div>
-      </Activity>
+      </LazyActivity>
 
       {keys.map((key) => (
-        <Activity key={`${workspace.id}:${key}`} mode={key === activeKey ? 'visible' : 'hidden'}>
+        <LazyActivity key={`${workspace.id}:${key}`} active={key === activeKey}>
           <div
             id={`panel-${workspace.id}-${key}`}
             className="editor"
@@ -44,14 +45,14 @@ export function ItemRendererHost({ workspace, primaryItem, openKeys, activeKey }
           >
             <ItemSlot workspace={workspace} itemKey={key} />
           </div>
-        </Activity>
+        </LazyActivity>
       ))}
     </div>
   );
 }
 
 function PrimarySlot({ workspace, item }: { workspace: WorkspaceInfo; item: Item | undefined }) {
-  const Component = useRegistry().itemRenderer.get('primary')?.component;
+  const Component = useRegistry().itemRenderer.get(PRIMARY_TYPE)?.component;
   if (!Component) {
     return <div className="empty">No renderer registered for type “primary”.</div>;
   }

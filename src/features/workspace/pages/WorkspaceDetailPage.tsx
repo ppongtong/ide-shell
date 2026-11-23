@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffectEvent, useLayoutEffect } from 'react';
 import { getRouteApi } from '@tanstack/react-router';
-import { EMPTY, parsePanels, useRegistry } from '@/lib/plugin-system';
+import { EMPTY, findPrimaryItem, parsePanels, useRegistry } from '@/lib/plugin-system';
 import { indexItems, openableKeys } from '../lib/search';
 import { useWorkbench } from '../stores/workbench';
 import { useSyncWorkspaceContract } from '../hooks/useSyncWorkspaceContract';
@@ -27,7 +27,7 @@ export function WorkspaceDetailPage() {
   const validKeySet = openableKeys(workspace, registry.itemRenderer);
   const isOpenable = !!item && validKeySet.has(item);
   const activeItem = isOpenable ? byKey.get(item) : undefined;
-  const primaryItem = workspace.items.find((i) => i.type === 'primary' && i.parentId === null);
+  const primaryItem = findPrimaryItem(workspace);
 
   // Compute one canonical open-tab list so TabBar and ItemRendererHost always match on deep links.
   const validStored = storedTabs.filter((k) => validKeySet.has(k));

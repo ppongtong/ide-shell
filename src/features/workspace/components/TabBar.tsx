@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent } from 'react';
 import { KeyRound, X } from 'lucide-react';
-import { parseItem, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
+import { parseItem, PRIMARY_TYPE, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
 import { indexItems } from '../lib/search';
 import { useTabActions } from '../hooks/useTabs';
 
@@ -16,7 +16,7 @@ export function TabBar({ workspace, primaryItem, openKeys, activeKey }: Props) {
   const actions = useTabActions(workspace);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const primaryRenderer = registry.itemRenderer.get('primary');
+  const primaryRenderer = registry.itemRenderer.get(PRIMARY_TYPE);
   const PrimaryIcon = primaryRenderer?.icon ?? KeyRound;
   const primaryLabel = primaryItem?.name ?? primaryRenderer?.label ?? 'Primary';
 
@@ -41,6 +41,7 @@ export function TabBar({ workspace, primaryItem, openKeys, activeKey }: Props) {
   }
 
   const primaryActive = !activeKey;
+  const activeTabInBar = !!activeKey && openKeys.includes(activeKey);
 
   return (
     <div ref={listRef} className="tabbar" role="tablist" aria-label="Open items">
@@ -51,7 +52,7 @@ export function TabBar({ workspace, primaryItem, openKeys, activeKey }: Props) {
           id={`tab-${workspace.id}-__primary__`}
           className="tab-label"
           role="tab"
-          tabIndex={primaryActive ? 0 : -1}
+          tabIndex={primaryActive || !activeTabInBar ? 0 : -1}
           aria-selected={primaryActive}
           aria-controls={`panel-${workspace.id}-__primary__`}
           onClick={() => {

@@ -1,13 +1,13 @@
 // Pure Explorer tree builder. Kept outside React components so React Compiler
 // caches the O(N log N) grouping & localeCompare sorts strictly on `(items, renderers)`.
-import { EMPTY, type Item, type ItemRenderer } from '@/lib/plugin-system';
+import { EMPTY, PRIMARY_TYPE, type Item, type ItemRenderer } from '@/lib/plugin-system';
 
 export const OTHER_GROUP_ID = 'group:__other__';
 
 export interface ExplorerTree {
   readonly byId: ReadonlyMap<string, Item>;
   readonly byParent: ReadonlyMap<string | null, readonly Item[]>;
-  readonly primaryRoots: readonly Item[];
+  readonly primaryItem: Item | undefined;
   /** Top-level container-only items (e.g. `type: 'folder'` where `component` is omitted). */
   readonly rootFolders: readonly Item[];
   readonly groupRenderers: readonly ItemRenderer[];
@@ -43,7 +43,7 @@ export function buildExplorerTree(
   }
 
   const isFolderItem = (i: Item) => {
-    if (i.type === 'primary') return false;
+    if (i.type === PRIMARY_TYPE) return false;
     const r = renderers.get(i.type);
     return (!!r && !r.component) || (byParent.get(i.id)?.length ?? 0) > 0;
   };
@@ -52,19 +52,18 @@ export function buildExplorerTree(
     bucket.sort((a, b) => Number(isFolderItem(b)) - Number(isFolderItem(a)) || a.name.localeCompare(b.name));
   }
 
+  // Matches `findPrimaryItem(workspace)` (first root item with `type === PRIMARY_TYPE`).
+  const primaryItem = items.find((i) => i.type === PRIMARY_TYPE && i.parentId === null);
+
   // Every non-primary renderer that provides a main-pane `component` gets a root Explorer group.
-  const groupRenderers = [...renderers.values()].filter((r) => r.type !== 'primary' && !!r.component);
-  const primaryRoots: Item[] = [];
+  const groupRenderers = [...renderers.values()].filter((r) => r.type !== PRIMARY_TYPE && !!r.component);
   const rootFolders: Item[] = [];
   const byRendererType = new Map<string, Item[]>();
   const unknown: Item[] = [];
 
   // Partition root items (`byParent.get(null)`) once; nested items render inside their parent's subtree.
   for (const item of byParent.get(null) ?? EMPTY) {
-    if (item.type === 'primary') {
-      primaryRoots.push(item);
-      continue;
-    }
+    if (item.type === PRIMARY_TYPE) continue;
     const renderer = renderers.get(item.type);
     if (!renderer) {
       unknown.push(item);
@@ -81,6 +80,7 @@ export function buildExplorerTree(
 
   const collapsibleIds: string[] = [];
   for (const item of items) {
+    if (item.type === PRIMARY_TYPE && item.id !== primaryItem?.id) continue;
     const r = renderers.get(item.type);
     if ((byParent.get(item.id)?.length ?? 0) > 0 || (!!r && !r.component)) {
       collapsibleIds.push(item.id);
@@ -96,7 +96,7 @@ export function buildExplorerTree(
   return {
     byId,
     byParent,
-    primaryRoots: primaryRoots.length > 0 ? primaryRoots : EMPTY,
+    primaryItem,
     rootFolders: rootFolders.length > 0 ? rootFolders : EMPTY,
     groupRenderers,
     byRendererType,
@@ -123,7 +123,7 @@ export function ancestorContainerIds(
   }
 
   const rootItem = (ancestors[0] ? byId.get(ancestors[0]) : undefined) ?? item;
-  if (rootItem.type === 'primary') return ancestors;
+  if (rootItem.type === PRIMARY_TYPE) return ancestors;
 
   const rootRenderer = renderers.get(rootItem.type);
   if (rootRenderer && !rootRenderer.component) return ancestors;

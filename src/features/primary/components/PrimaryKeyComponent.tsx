@@ -98,6 +98,26 @@ function parseMetadata(raw: string | undefined): PrimaryMetadata {
   return {};
 }
 
+async function applyPrimaryOption(chosen: PrimaryKeyOption): Promise<string | null> {
+  try {
+    const actions = useWorkspaceContract.getState().actions;
+    const ok = actions
+      ? await actions.setPrimaryItem({
+          name: chosen.name,
+          content: JSON.stringify({
+            key: chosen.key,
+            source: chosen.source,
+            description: chosen.description,
+          }),
+          children: chosen.children,
+        })
+      : false;
+    return ok ? null : 'Could not bind primary key to this workspace.';
+  } catch (err) {
+    return err instanceof Error ? err.message : 'Could not bind primary key to this workspace.';
+  }
+}
+
 export default function PrimaryKeyComponent({ workspace, item }: ItemRendererProps) {
   if (!item) {
     return <PrimaryKeySelector workspace={workspace} />;
@@ -116,16 +136,8 @@ function PrimaryKeySelector({ workspace }: { workspace: WorkspaceInfo }) {
     if (!chosen || isPending) return;
     setError(null);
     startSaving(async () => {
-      const ok = await useWorkspaceContract.getState().actions?.setPrimaryItem({
-        name: chosen.name,
-        content: JSON.stringify({
-          key: chosen.key,
-          source: chosen.source,
-          description: chosen.description,
-        }),
-        children: chosen.children,
-      });
-      if (!ok) setError('Could not bind primary key to this workspace.');
+      const errMsg = await applyPrimaryOption(chosen);
+      if (errMsg) setError(errMsg);
     });
   }
 

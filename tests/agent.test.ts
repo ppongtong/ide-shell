@@ -1,20 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRegistry, type Plugin } from '@/lib/plugin-system';
 import { useWorkspaceContract, type WorkspaceSnapshot } from '../src/features/workspace/contract.ts';
 import { useExplorerContract } from '../src/features/explorer/contract.ts';
 import { agentApi, runAgentAction } from '../src/features/agent/api/agent.ts';
-
-const Icon = () => null;
-
-const testPlugin: Plugin = {
-  id: 'test.renderers',
-  itemRenderers: [
-    { type: 'primary', label: 'Primary Key', icon: Icon, component: Icon },
-    { type: 'folder', label: 'Folder', icon: Icon },
-    { type: 'file', label: 'File', icon: Icon, component: Icon },
-  ],
-};
 
 const primaryRoot = { id: 'primary-acme', type: 'primary', name: 'Storefront Core', parentId: null } as const;
 
@@ -44,47 +32,57 @@ describe('agentApi & action runner', () => {
     assert.deepEqual(closeRes.actions, [{ target: 'workspace', type: 'closeItem', itemId: 'utils' }]);
   });
 
-  it('routes folder and primary openItem actions cleanly using ItemRenderer metadata', () => {
-    const registry = createRegistry([testPlugin]);
-    const revealed: Array<{ wsId: string; ids: readonly string[] }> = [];
-    let primaryShown = 0;
+  it('routes openItem and closeItem through workspace/explorer contracts without leaking item-type rules', () => {
+    const revealed: string[] = [];
+    const opened: string[] = [];
 
     useWorkspaceContract.getState().setActions({
       isActiveWorkspace: (id) => id === 'acme',
-      showPrimary: () => {
-        primaryShown += 1;
-        return true;
+      showPrimary: () => true,
+      openItem: (id) => {
+        if (id === 'utils') {
+          opened.push(id);
+          return true;
+        }
+        return false;
       },
-      openItem: () => false,
       closeItem: () => false,
       setPrimaryItem: async () => true,
     });
     useExplorerContract.getState().setActions({
-      revealItems: (wsId, ids) => {
-        revealed.push({ wsId, ids });
+      revealItem: (id) => {
+        if (id === 'src' || id === 'primary-acme' || id === 'utils') {
+          revealed.push(id);
+          return true;
+        }
+        return false;
       },
-      collapseAll: () => true,
-      expandAll: () => true,
+      collapseAll: () => {},
+      expandAll: () => {},
     });
 
     try {
-      const folderNote = runAgentAction(
-        { target: 'workspace', type: 'openItem', itemId: 'src' },
-        snapshot.workspace,
-        registry.itemRenderer,
-      );
-      assert.equal(folderNote, null);
-      assert.equal(primaryShown, 0);
-      assert.deepEqual(revealed, [{ wsId: 'acme', ids: ['src'] }]);
+      // Folder: openItem returns false, falls back cleanly to Explorer revealItem('src')
+      assert.equal(runAgentAction({ target: 'workspace', type: 'openItem', itemId: 'src' }), null);
+      assert.deepEqual(revealed, ['src']);
 
-      const rootNote = runAgentAction(
-        { target: 'workspace', type: 'openItem', itemId: 'primary-acme' },
-        snapshot.workspace,
-        registry.itemRenderer,
+      // Primary item when already on Primary tab (openItem -> showPrimary false, revealItem expands it)
+      assert.equal(runAgentAction({ target: 'workspace', type: 'openItem', itemId: 'primary-acme' }), null);
+      assert.deepEqual(revealed, ['src', 'primary-acme']);
+
+      // File: opens tab AND reveals in Explorer
+      assert.equal(runAgentAction({ target: 'workspace', type: 'openItem', itemId: 'utils' }), null);
+      assert.deepEqual(opened, ['utils']);
+
+      // Unknown item: both return false
+      assert.equal(
+        runAgentAction({ target: 'workspace', type: 'openItem', itemId: 'missing' }),
+        'Could not open that item.',
       );
-      assert.equal(rootNote, null);
-      assert.equal(primaryShown, 1);
-      assert.deepEqual(revealed[1], { wsId: 'acme', ids: ['primary-acme'] });
+      assert.equal(
+        runAgentAction({ target: 'workspace', type: 'closeItem', itemId: 'src' }),
+        'That tab is not open.',
+      );
     } finally {
       useWorkspaceContract.getState().clear();
       useExplorerContract.getState().clear();

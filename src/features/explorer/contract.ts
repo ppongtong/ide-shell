@@ -1,22 +1,17 @@
 // ─────────────────────────────────────────────────────────────
-// Public cross-feature contract of `core.explorer` (reference example
-// of how any feature shares state & actions with other features).
+// Public cross-feature contract of `core.explorer`.
+// Shares domain-level tree actions without leaking internal node/group IDs.
 // ─────────────────────────────────────────────────────────────
 import { createPluginBridge } from '@/lib/plugin-system';
 
-export interface ExplorerSnapshot {
-  readonly workspaceId: string | null;
-  /** Collapsed container/group IDs in the active workspace (`group:file`, `primary-storefront`, etc.). */
-  readonly collapsedIds: readonly string[];
-}
-
 export interface ExplorerActions {
-  /** Ensure every ID in `nodeIds` is expanded (used by Breadcrumbs when clicking a parent folder). */
-  revealItems(wsId: string, nodeIds: readonly string[]): void;
+  /** Expand `itemId` (if collapsible) and every ancestor folder/group needed to make it visible. */
+  revealItem(itemId: string): boolean;
   /** Collapse all collapsible roots/groups in the active Explorer workspace. */
-  collapseAll(): boolean;
+  collapseAll(): void;
   /** Expand all collapsed nodes in the active Explorer workspace. */
-  expandAll(): boolean;
+  expandAll(): void;
 }
 
-export const useExplorerContract = createPluginBridge<ExplorerSnapshot, ExplorerActions>();
+export const useExplorerContract = createPluginBridge<null, ExplorerActions>();
+export const usePublishExplorerContract = useExplorerContract.usePublish;

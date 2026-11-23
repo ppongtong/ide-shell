@@ -5,11 +5,11 @@
 //     when no primary item has been chosen yet, or the primary root + children once set).
 //   • Groups remaining openable items by registered `ItemRenderer`.
 // ─────────────────────────────────────────────────────────────
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect } from 'react';
 import { ChevronDown, ChevronRight, File, KeyRound } from 'lucide-react';
-import { EMPTY, itemKey, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
+import { EMPTY, itemKey, PRIMARY_TYPE, useRegistry, type Item, type WorkspaceInfo } from '@/lib/plugin-system';
 import { useWorkspaceContract } from '@/features/workspace/contract';
-import { useExplorerContract } from '../contract';
+import { usePublishExplorerContract } from '../contract';
 import { ancestorContainerIds, buildExplorerTree, OTHER_GROUP_ID } from '../lib/tree';
 import { useExplorerStore } from '../stores/explorer-store';
 
@@ -37,18 +37,9 @@ function WorkspaceExplorer({ workspace }: { workspace: WorkspaceInfo }) {
   const collapseAllInStore = useExplorerStore((s) => s.collapseAll);
   const expandWorkspace = useExplorerStore((s) => s.expandWorkspace);
 
-  const setSnapshot = useExplorerContract((s) => s.setSnapshot);
-  const setActions = useExplorerContract((s) => s.setActions);
-  const clear = useExplorerContract((s) => s.clear);
-
   const registry = useRegistry();
   const tree = buildExplorerTree(workspace.items, registry.itemRenderer);
-  const PrimaryIcon = registry.itemRenderer.get('primary')?.icon ?? KeyRound;
-
-  const targetRef = useRef({ wsId: workspace.id, collapsibleIds: tree.collapsibleIds });
-  useLayoutEffect(() => {
-    targetRef.current = { wsId: workspace.id, collapsibleIds: tree.collapsibleIds };
-  }, [workspace.id, tree.collapsibleIds]);
+  const PrimaryIcon = registry.itemRenderer.get(PRIMARY_TYPE)?.icon ?? KeyRound;
 
   // Auto-reveal ancestor folders/group whenever the active tab changes.
   useLayoutEffect(() => {
@@ -57,35 +48,25 @@ function WorkspaceExplorer({ workspace }: { workspace: WorkspaceInfo }) {
     revealItems(workspace.id, toReveal);
   }, [workspace.id, activeItem, tree.byId, registry.itemRenderer, revealItems]);
 
-  useLayoutEffect(() => {
-    setSnapshot({ workspaceId: workspace.id, collapsedIds: collapsed });
-  }, [workspace.id, collapsed, setSnapshot]);
-
-  useLayoutEffect(() => {
-    setActions({
-      revealItems,
-      collapseAll() {
-        const { wsId, collapsibleIds } = targetRef.current;
-        collapseAllInStore(wsId, collapsibleIds);
-        return true;
-      },
-      expandAll() {
-        expandWorkspace(targetRef.current.wsId);
-        return true;
-      },
-    });
-  }, [revealItems, collapseAllInStore, expandWorkspace, setActions]);
-
-  useLayoutEffect(() => {
-    return () => {
-      clear();
-    };
-  }, [clear]);
+  usePublishExplorerContract(null, {
+    revealItem(itemId) {
+      const item = tree.byId.get(itemId);
+      if (!item) return false;
+      revealItems(workspace.id, [...ancestorContainerIds(tree.byId, registry.itemRenderer, item), item.id]);
+      return true;
+    },
+    collapseAll() {
+      collapseAllInStore(workspace.id, tree.collapsibleIds);
+    },
+    expandAll() {
+      expandWorkspace(workspace.id);
+    },
+  });
 
   const renderNode = (item: Item, depth: number, extraClass = '') => {
     const renderer = registry.itemRenderer.get(item.type);
     const Icon = renderer?.icon ?? File;
-    const isPrimary = item.type === 'primary';
+    const isPrimary = item.type === PRIMARY_TYPE;
     const children = tree.byParent.get(item.id) ?? EMPTY;
     const hasChildren = children.length > 0;
     const isFolderOnly = !!renderer && !renderer.component;
@@ -160,8 +141,8 @@ function WorkspaceExplorer({ workspace }: { workspace: WorkspaceInfo }) {
   return (
     <ul className="tree" role="list" aria-label="Explorer">
       {/* 1. Pinned Primary slot at top (unselected prompt vs. configured primary root + children) */}
-      {tree.primaryRoots.length > 0 ? (
-        tree.primaryRoots.map((root) => renderNode(root, 0, 'primary-root'))
+      {tree.primaryItem ? (
+        renderNode(tree.primaryItem, 0, 'primary-root')
       ) : (
         <li>
           <button

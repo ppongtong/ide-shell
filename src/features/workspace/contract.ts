@@ -46,3 +46,4 @@ export interface WorkspaceActions {
 }
 
 export const useWorkspaceContract = createPluginBridge<WorkspaceSnapshot, WorkspaceActions>();
+export const usePublishWorkspaceContract = useWorkspaceContract.usePublish;

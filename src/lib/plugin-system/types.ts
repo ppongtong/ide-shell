@@ -21,6 +21,9 @@ export interface ShellLocation {
 
 // ── Workspace items & uniform item renderers ────────────────
 
+/** Reserved item `type` rendered in the workspace's pinned first tab. */
+export const PRIMARY_TYPE = 'primary';
+
 export interface Item {
   readonly id: string;
   readonly type: string;
@@ -35,6 +38,10 @@ export interface WorkspaceInfo {
   readonly description?: string;
   readonly items: readonly Item[];
 }
+
+/** Resolve the workspace's root `type: 'primary'` item (`undefined` until selected). */
+export const findPrimaryItem = (workspace: WorkspaceInfo): Item | undefined =>
+  workspace.items.find((i) => i.type === PRIMARY_TYPE && i.parentId === null);
 
 export interface ItemRendererProps {
   readonly workspace: WorkspaceInfo;

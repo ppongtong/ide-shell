@@ -15,7 +15,7 @@ const renderers = new Map<string, ItemRenderer>([
 ]);
 
 describe('explorer tree & store', () => {
-  it('pins primary roots with nested children and groups remaining openable items by renderer type', () => {
+  it('pins primary root with nested children and groups remaining openable items by renderer type', () => {
     const items: Item[] = [
       { id: 'primary-1', type: 'primary', name: 'Storefront Core', parentId: null },
       { id: 'child-b', type: 'file', name: 'b.ts', parentId: 'primary-1' },
@@ -25,10 +25,7 @@ describe('explorer tree & store', () => {
     ];
 
     const tree = buildExplorerTree(items, renderers);
-    assert.deepEqual(
-      tree.primaryRoots.map((i) => i.id),
-      ['primary-1'],
-    );
+    assert.equal(tree.primaryItem?.id, 'primary-1');
     assert.deepEqual(
       (tree.byParent.get('primary-1') ?? []).map((i) => i.name),
       ['a.ts', 'b.ts'],

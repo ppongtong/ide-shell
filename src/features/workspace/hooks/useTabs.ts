@@ -6,7 +6,7 @@
 //     from `/workspaces/${workspace.id}` (fixes pending-navigation race).
 // ─────────────────────────────────────────────────────────────
 import { useRouter, type AnyRouter } from '@tanstack/react-router';
-import { EMPTY, itemKey, useRegistry, type Registry, type WorkspaceInfo } from '@/lib/plugin-system';
+import { EMPTY, itemKey, PRIMARY_TYPE, useRegistry, type Registry, type WorkspaceInfo } from '@/lib/plugin-system';
 import { indexItems, isClosableTabType } from '../lib/search';
 import { useWorkbench } from '../stores/workbench';
 
@@ -81,7 +81,7 @@ export function createTabController(
     if (!ws) return false;
     const item = indexItems(ws).byId.get(itemId);
     if (!item) return false;
-    if (item.type === 'primary') return showPrimary();
+    if (item.type === PRIMARY_TYPE) return showPrimary();
     if (!isClosableTabType(registry.itemRenderer, item.type)) return false;
 
     const key = itemKey(item.type, item.id);

@@ -73,16 +73,15 @@ Every plugin lives in `src/features/<name>/` with two explicit public doors:
   - Any other `type` with a `component` (`notebook`, `file`, `dataset`): Gets its own collapsible section in `ExplorerPanel` and opens in a closable tab (`?item=type:id`).
   - `type` without a `component` (`folder`): Acts as a collapsible folder in `ExplorerPanel`.
 - **Shell state (`useShellLocation`, `useRegistry`):** Routes declare `staticData.container` (e.g. `'workspace.detail'`) instead of hardcoding route strings in `lib/plugin-system`. `ActivityBar` toggles `?panels=` generically on the active container route (`to: '.'`).
-- **Feature-to-feature state (`createPluginBridge`):**
-  - `features/workspace/contract.ts` publishes `{ workspace, primaryItem, activeKey, activeItem, openItems }` and `{ isActiveWorkspace, showPrimary, openItem, closeItem, setPrimaryItem }` via `useLayoutEffect`.
-  - `features/explorer/contract.ts` consumes `workspace/contract` to render the tree **and** publishes `{ workspaceId, collapsedIds }` + `{ revealItems, collapseAll, expandAll }`—used by `WorkspaceBreadcrumbs` and `AgentPanel`.
+- **Feature-to-feature state (`createPluginBridge` + `.usePublish`):**
+  - `features/workspace/contract.ts` publishes `{ workspace, primaryItem, activeKey, activeItem, openItems }` and `{ isActiveWorkspace, showPrimary, openItem, closeItem, setPrimaryItem }`.
+  - `features/explorer/contract.ts` consumes `workspace/contract` to render the tree and publishes `{ revealItem, collapseAll, expandAll }`—used by `WorkspaceBreadcrumbs` and `AgentPanel`.
 
 ## React 19.x features used
 
 | Feature | Where | Why |
 | --- | --- | --- |
-| `<Activity>` (19.2) | `features/workspace/components/ItemRendererHost.tsx` | Pinned Primary tab + open tabs stay mounted while hidden: edits & selections survive tab switches |
-| `<Activity>` (19.2) | `components/ui/ResizableStack.tsx` | Hidden sidebar panels keep their state (agent chat) |
+| `<Activity>` (19.2) | `components/ui/LazyActivity.tsx` (`ItemRendererHost`, `ResizableStack`) | Lazy chunks load only on first view, then stay mounted while hidden so edits & chat survive switches |
 | `<ViewTransition>` (19.3) | `features/agent/components/AgentPanel.tsx` | New messages animate in |
 | `useEffectEvent` (19.2) | `WorkspaceDetailPage.tsx` | Effects read latest callbacks without extra dependencies |
 | Actions: `useActionState`, `useFormStatus`, `<form action>` | `NewWorkspaceDialog.tsx` | Declarative form validation and pending state |

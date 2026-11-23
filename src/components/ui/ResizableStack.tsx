@@ -5,7 +5,8 @@
 //   • Pointer drags update `flexGrow` + `aria-valuenow` directly via DOM refs
 //     (zero React renders during 60–120 Hz pointer movement; one commit on pointerup).
 // ─────────────────────────────────────────────────────────────
-import { Activity, useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { LazyActivity } from './LazyActivity';
 
 export interface StackSection {
   id: string;
@@ -34,9 +35,11 @@ interface DragState {
   latest: Record<string, number> | null;
 }
 
-const MIN = 0.15;
+const MIN_RATIO = 0.15;
 const KEY_STEP = 0.1;
 const DIVIDER_HEIGHT = 5;
+
+const FOCUSABLE_SELECTOR = 'input, select, textarea, button, [tabindex]:not([tabindex="-1"])';
 
 export function ResizableStack({ sections, sizes, onResize, focusOnShow }: Props) {
   const box = useRef<HTMLDivElement>(null);
@@ -48,20 +51,36 @@ export function ResizableStack({ sections, sizes, onResize, focusOnShow }: Props
   const visible = sections.filter((s) => s.visible);
   const visibleKey = visible.map((s) => s.id).join('\0');
 
-  // Focus a section's first interactive control when newly shown (not on first mount).
+  // Focus a section's first interactive control when newly shown (including after lazy Suspense resolves).
   useEffect(() => {
     const now = new Set(visibleKey ? visibleKey.split('\0') : []);
+    const observers: MutationObserver[] = [];
+
     if (focusOnShow && wasVisible.current) {
       for (const id of now) {
         if (!wasVisible.current.has(id)) {
-          bodies.current
-            .get(id)
-            ?.querySelector<HTMLElement>('input, select, textarea, button, [tabindex]:not([tabindex="-1"])')
-            ?.focus();
+          const bodyEl = bodies.current.get(id);
+          const target = bodyEl?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+          if (target) {
+            target.focus();
+          } else if (bodyEl) {
+            const obs = new MutationObserver(() => {
+              const loaded = bodyEl.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+              if (loaded) {
+                loaded.focus();
+                obs.disconnect();
+              }
+            });
+            obs.observe(bodyEl, { childList: true, subtree: true });
+            observers.push(obs);
+          }
         }
       }
     }
     wasVisible.current = now;
+    return () => {
+      for (const obs of observers) obs.disconnect();
+    };
   }, [focusOnShow, visibleKey]);
 
   function onPointerDown(e: PointerEvent<HTMLDivElement>, a: string, b: string) {
@@ -88,8 +107,9 @@ export function ResizableStack({ sections, sizes, onResize, focusOnShow }: Props
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return;
     const total = d.startA + d.startB;
+    const minSize = total * MIN_RATIO;
     const delta = (e.clientY - d.startY) / d.pxPerUnit;
-    const na = Math.max(MIN, Math.min(total - MIN, d.startA + delta));
+    const na = Math.max(minSize, Math.min(total - minSize, d.startA + delta));
     const nb = total - na;
     d.latest = { [d.a]: na, [d.b]: nb };
 
@@ -123,8 +143,9 @@ export function ResizableStack({ sections, sizes, onResize, focusOnShow }: Props
     const curA = sizes[a] ?? 1;
     const curB = sizes[b] ?? 1;
     const total = curA + curB;
+    const minSize = total * MIN_RATIO;
     const delta = (e.key === 'ArrowDown' ? 1 : -1) * total * KEY_STEP;
-    const na = Math.max(MIN, Math.min(total - MIN, curA + delta));
+    const na = Math.max(minSize, Math.min(total - minSize, curA + delta));
     onResize({ [a]: na, [b]: total - na });
   }
 
@@ -138,7 +159,7 @@ export function ResizableStack({ sections, sizes, onResize, focusOnShow }: Props
         const ratioPercent = Math.round((aboveSize / (aboveSize + curSize)) * 100);
 
         return (
-          <Activity key={s.id} mode={s.visible ? 'visible' : 'hidden'}>
+          <LazyActivity key={s.id} active={s.visible}>
             {above && (
               <div
                 className="divider"
@@ -164,7 +185,7 @@ export function ResizableStack({ sections, sizes, onResize, focusOnShow }: Props
               panelsRef={panels}
               bodiesRef={bodies}
             />
-          </Activity>
+          </LazyActivity>
         );
       })}
     </div>

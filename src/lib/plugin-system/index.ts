@@ -1,5 +1,5 @@
-// The plugin "SDK": the ONLY shell entry point features import from.
-// Nothing in here imports from app/, routes/ or features/.
+// The plugin SDK: plugin types, registry, cross-plugin bridge, URL helpers, and shell location.
+// Nothing in here imports from app/, routes/, features/, stores/, or components/.
 export * from './types';
 export * from './bridge';
 export * from './registry';

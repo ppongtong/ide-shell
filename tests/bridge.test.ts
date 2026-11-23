@@ -21,7 +21,8 @@ describe('createPluginBridge', () => {
     const useCounterBridge = createPluginBridge<CounterSnapshot, CounterActions>();
     let n = 0;
 
-    useCounterBridge.getState().setSnapshot({ count: 3 });
+    const snap = { count: 3 };
+    useCounterBridge.getState().setSnapshot(snap);
     useCounterBridge.getState().setActions({
       increment: () => {
         n += 1;
@@ -36,6 +37,9 @@ describe('createPluginBridge', () => {
     const unsub = useCounterBridge.subscribe(() => {
       notifications += 1;
     });
+    // Re-publishing the exact same snapshot reference is a 0-notification no-op:
+    useCounterBridge.getState().setSnapshot(snap);
+    assert.equal(notifications, 0);
     useCounterBridge.getState().clear();
     assert.equal(useCounterBridge.getState().current, null);
     assert.equal(useCounterBridge.getState().actions, null);

@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 import { Fragment, type ReactNode } from 'react';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
-import { parseItem, useRegistry, type Item } from '@/lib/plugin-system';
+import { findPrimaryItem, parseItem, PRIMARY_TYPE, useRegistry, type Item } from '@/lib/plugin-system';
 import { CrumbButton, CrumbSep, CrumbText } from '@/components/ui/Breadcrumb';
 import { useExplorerContract } from '@/features/explorer/contract';
 import { pathTo, type Workspace, type WorkspaceSummary } from '../api/workspaces';
@@ -20,8 +20,8 @@ export function WorkspaceBreadcrumbs(): ReactNode {
   const registry = useRegistry();
   const navigate = useNavigate();
 
-  const primaryItem = workspace.items.find((i) => i.type === 'primary' && i.parentId === null);
-  const primaryLabel = primaryItem?.name ?? registry.itemRenderer.get('primary')?.label ?? 'Primary';
+  const primaryItem = findPrimaryItem(workspace);
+  const primaryLabel = primaryItem?.name ?? registry.itemRenderer.get(PRIMARY_TYPE)?.label ?? 'Primary';
 
   const ref = parseItem(item);
   const chain: Item[] = ref ? pathTo(workspace.items, ref.id) : [];
@@ -62,8 +62,7 @@ export function WorkspaceBreadcrumbs(): ReactNode {
             ) : (
               <CrumbButton
                 onClick={() => {
-                  const ids = chain.slice(0, i + 1).map((x) => x.id);
-                  useExplorerContract.getState().actions?.revealItems(workspace.id, ids);
+                  useExplorerContract.getState().actions?.revealItem(it.id);
                 }}
               >
                 {it.name}

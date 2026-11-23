@@ -58,7 +58,7 @@ export const useWorkbench = create<WorkbenchState>()(
         const i = list.indexOf(key);
         if (i === -1) return cur.lastActive[ws] ?? null;
         const rest = list.filter((k) => k !== key);
-        const fallback = rest[i] ?? rest[i - 1] ?? null; // right neighbour, else left, else Details tab
+        const fallback = rest[i] ?? rest[i - 1] ?? null; // right neighbour, else left, else Primary tab
         set((s) => {
           const nextActive = { ...s.lastActive };
           if (s.lastActive[ws] === key) {

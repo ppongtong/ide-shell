@@ -17,7 +17,7 @@ import {
   type FormEvent,
 } from 'react';
 import { Send } from 'lucide-react';
-import { EMPTY, useRegistry, type ItemRenderer } from '@/lib/plugin-system';
+import { EMPTY } from '@/lib/plugin-system';
 import { useWorkspaceContract, type WorkspaceSnapshot } from '@/features/workspace/contract';
 import { agentApi, runAgentAction } from '../api/agent';
 
@@ -28,11 +28,10 @@ interface Msg {
   pending?: boolean;
 }
 
-async function askAndApply(
-  text: string,
-  asked: WorkspaceSnapshot | null,
-  renderers: ReadonlyMap<string, ItemRenderer>,
-): Promise<string> {
+let nextMsgSeq = 0;
+const nextMsgId = () => `msg-${++nextMsgSeq}`;
+
+async function askAndApply(text: string, asked: WorkspaceSnapshot | null): Promise<string> {
   let reply;
   try {
     reply = await agentApi.ask(text, asked);
@@ -48,7 +47,7 @@ async function askAndApply(
       return `${answer} Skipped: you left that workspace.`;
     }
     for (const action of reply.actions) {
-      const note = runAgentAction(action, askedWs, renderers);
+      const note = runAgentAction(action);
       if (note) answer += ` (${note})`;
     }
   }
@@ -56,7 +55,6 @@ async function askAndApply(
 }
 
 export default function AgentPanel() {
-  const registry = useRegistry();
   const wsId = useWorkspaceContract((s) => s.current?.workspace?.id);
   const wsName = useWorkspaceContract((s) => s.current?.workspace?.name);
   const primaryId = useWorkspaceContract((s) => s.current?.primaryItem?.id);
@@ -85,15 +83,15 @@ export default function AgentPanel() {
 
     const asked = useWorkspaceContract.getState().current;
     const targetWs = asked?.workspace?.id ?? '_none';
-    const mine: Msg = { id: crypto.randomUUID(), from: 'you', text };
+    const mine: Msg = { id: nextMsgId(), from: 'you', text };
 
     startSending(async () => {
       addOptimistic({ ws: targetWs, msg: { ...mine, pending: true } });
-      const answer = await askAndApply(text, asked, registry.itemRenderer);
+      const answer = await askAndApply(text, asked);
       startTransition(() => {
         setHistory((prev) => ({
           ...prev,
-          [targetWs]: [...(prev[targetWs] ?? EMPTY), mine, { id: crypto.randomUUID(), from: 'agent', text: answer }],
+          [targetWs]: [...(prev[targetWs] ?? EMPTY), mine, { id: nextMsgId(), from: 'agent', text: answer }],
         }));
       });
     });
